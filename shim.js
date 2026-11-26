@@ -18,7 +18,7 @@
   }
   function dataUrl(fn, a) {
     var k = a.map(function (x) { return x == null ? '' : String(x); }).join('_') || 'x';
-    return BASE + 'data/' + fn + '/' + encodeURIComponent(k) + '.json';
+    return 'https://raw.githubusercontent.com/claude6683/8537/main/' + 'data/' + fn + '/' + encodeURIComponent(k) + '.json';
   }
 
   /* ----- 모의거래: 브라우저 저장 ----- */
