@@ -1,46 +1,4 @@
-
-}
-
-/* ===================== nasdaq-alert (나스닥 ^IXIC 5대 지표 경보, claude6683.github.io/nasdaq-alert 와 같은 계산) ===================== */
-const NQ_S = { rsi: 74, pb: 1, k: 90, dp: 14.9 }, NQ_B = { rsi: 28, pb: 0.05, k: 10, dp: -12.5 };
-async function nasdaqAlert() {
-  const hit = await cget('nqa', 3600); if (hit) return hit;
-  const r = await yc('^IXIC', '10y', '1d'); if (!r) throw new Error('나스닥 시세 조회 실패');
-  const q = r.indicators.quote[0], off = r.meta.gmtoffset || 0, bars = [];
-  r.timestamp.forEach((t, k) => { if (q.close[k] == null || q.open[k] == null || q.high[k] == null || q.low[k] == null) return; bars.push({ d: new Date((t + off) * 1000).toISOString().slice(0, 10), h: q.high[k], l: q.low[k], c: q.close[k] }); });
-  const n = bars.length; if (n < 220) throw new Error('나스닥 데이터 부족');
-  const c = bars.map((b) => b.c);
-  const sma = (a, m) => { const o = []; let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= m) s -= a[i - m]; o.push(i >= m - 1 ? s / m : null); } return o; };
-  const ema = (a, m) => { const k = 2 / (m + 1), o = [a[0]]; for (let i = 1; i < a.length; i++) o.push(k * a[i] + (1 - k) * o[i - 1]); return o; };
-  let ag = 0, al = 0;
-  for (let i = 0; i < n; i++) {
-    bars[i].rsi = null; if (!i) continue;
-    const d = c[i] - c[i - 1], g = d > 0 ? d : 0, l = d < 0 ? -d : 0;
-    if (i <= 14) { ag += g / 14; al += l / 14; } else { ag = (ag * 13 + g) / 14; al = (al * 13 + l) / 14; }
-    if (i >= 14) bars[i].rsi = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
-  }
-  const m20 = sma(c, 20), m200 = sma(c, 200), e12 = ema(c, 12), e26 = ema(c, 26), mac = e12.map((v, k) => v - e26[k]), sg = ema(mac, 9), rk = [];
-  for (let i = 0; i < n; i++) {
-    const b = bars[i];
-    b.m20 = m20[i]; b.dp = m200[i] ? (c[i] / m200[i] - 1) * 100 : null; b.macd = mac[i]; b.sig9 = sg[i];
-    if (m20[i] != null) { let s = 0; for (let j = i - 19; j <= i; j++) s += Math.pow(c[j] - m20[i], 2); const sd = Math.sqrt(s / 19); b.pb = sd ? (c[i] - (m20[i] - 2 * sd)) / (4 * sd) : null; } else b.pb = null;
-    if (i >= 13) { let hi = -1e18, lo = 1e18; for (let j = i - 13; j <= i; j++) { if (bars[j].h > hi) hi = bars[j].h; if (bars[j].l < lo) lo = bars[j].l; } rk.push(hi > lo ? (c[i] - lo) / (hi - lo) * 100 : null); } else rk.push(null);
-  }
-  const kk = [], dd = [];
-  for (let i = 0; i < n; i++) { const w = rk.slice(Math.max(0, i - 2), i + 1); kk.push(i >= 15 && w.length === 3 && w.indexOf(null) < 0 ? (w[0] + w[1] + w[2]) / 3 : null); }
-  for (let i = 0; i < n; i++) { const w = kk.slice(Math.max(0, i - 2), i + 1); dd.push(i >= 17 && w.length === 3 && w.indexOf(null) < 0 ? (w[0] + w[1] + w[2]) / 3 : null); }
-  let last = null;
-  for (let i = 0; i < n; i++) {
-    const b = bars[i], p = bars[i - 1]; b.k = kk[i]; b.dk = dd[i]; b.ss = 0; b.bs = 0;
-    if (b.rsi == null || b.pb == null || b.k == null || b.dp == null || !p || p.k == null || p.dk == null || b.dk == null) continue;
-    if (b.rsi >= NQ_S.rsi && b.pb >= NQ_S.pb && b.k >= NQ_S.k) { b.ss = 1; if (b.dp >= NQ_S.dp || (b.k < b.dk && p.k >= p.dk) || (b.macd < b.sig9 && p.macd >= p.sig9) || b.c < b.m20) b.ss = 2; }
-    if (b.rsi <= NQ_B.rsi && b.pb <= NQ_B.pb && b.k <= NQ_B.k) { b.bs = 1; if (b.dp <= NQ_B.dp || (b.k > b.dk && p.k <= p.dk) || (b.macd > b.sig9 && p.macd <= p.sig9) || b.pb > p.pb) b.bs = 2; }
-  }
-  for (let i = n - 1; i >= 0; i--) if (bars[i].ss || bars[i].bs) { last = bars[i]; break; }
-  const t = bars[n - 1], out = { asOf: t.d, c: r2(t.c), rsi: t.rsi == null ? null : r2(t.rsi), pb: t.pb == null ? null : r2(t.pb), k: t.k == null ? null : r2(t.k), dp: t.dp == null ? null : Math.round(t.dp * 10) / 10, alert: null };
-  if (last) { const sell = last.ss >= last.bs && last.ss > 0, lv = sell ? last.ss : last.bs; out.alert = { s: sell ? 'SELL' : 'BUY', lv: lv === 2 ? '확정' : '핵심', d: last.d, c: r2(last.c), rsi: r2(last.rsi), pb: r2(last.pb), k: r2(last.k), dp: Math.round(last.dp * 10) / 10 }; }
-  await cput('nqa', out, 3600); return out;
-  if (b) { try { b.alert = await nasdaqAlert(); } catch (e) { b.alert = null; } }import { getStore } from '@netlify/blobs';
+import { getStore } from '@netlify/blobs';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 const TZ = 'Asia/Seoul';
@@ -579,7 +537,49 @@ async function gongdu_getData(date) {
   let b = await pget('g/' + pick, null);
   if (b && pick === today && (!b.news || !b.news.length) && !mem.get('gd_heal')) { mem.set('gd_heal', { e: Date.now() + 3600000, v: 1 }); try { b = await gongduExtras(); } catch (e) {} }
   if (b) b.tripod = await tripodBlock();
+  if (b) { try { b.alert = await nasdaqAlert(); } catch (e) { b.alert = null; } }
   return { dates: dates, b: b };
+}
+
+/* ===================== nasdaq-alert (나스닥 ^IXIC 5대 지표 경보, claude6683.github.io/nasdaq-alert 와 같은 계산) ===================== */
+const NQ_S = { rsi: 74, pb: 1, k: 90, dp: 14.9 }, NQ_B = { rsi: 28, pb: 0.05, k: 10, dp: -12.5 };
+async function nasdaqAlert() {
+  const hit = await cget('nqa', 3600); if (hit) return hit;
+  const r = await yc('^IXIC', '10y', '1d'); if (!r) throw new Error('나스닥 시세 조회 실패');
+  const q = r.indicators.quote[0], off = r.meta.gmtoffset || 0, bars = [];
+  r.timestamp.forEach((t, k) => { if (q.close[k] == null || q.open[k] == null || q.high[k] == null || q.low[k] == null) return; bars.push({ d: new Date((t + off) * 1000).toISOString().slice(0, 10), h: q.high[k], l: q.low[k], c: q.close[k] }); });
+  const n = bars.length; if (n < 220) throw new Error('나스닥 데이터 부족');
+  const c = bars.map((b) => b.c);
+  const sma = (a, m) => { const o = []; let s = 0; for (let i = 0; i < a.length; i++) { s += a[i]; if (i >= m) s -= a[i - m]; o.push(i >= m - 1 ? s / m : null); } return o; };
+  const ema = (a, m) => { const k = 2 / (m + 1), o = [a[0]]; for (let i = 1; i < a.length; i++) o.push(k * a[i] + (1 - k) * o[i - 1]); return o; };
+  let ag = 0, al = 0;
+  for (let i = 0; i < n; i++) {
+    bars[i].rsi = null; if (!i) continue;
+    const d = c[i] - c[i - 1], g = d > 0 ? d : 0, l = d < 0 ? -d : 0;
+    if (i <= 14) { ag += g / 14; al += l / 14; } else { ag = (ag * 13 + g) / 14; al = (al * 13 + l) / 14; }
+    if (i >= 14) bars[i].rsi = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+  }
+  const m20 = sma(c, 20), m200 = sma(c, 200), e12 = ema(c, 12), e26 = ema(c, 26), mac = e12.map((v, k) => v - e26[k]), sg = ema(mac, 9), rk = [];
+  for (let i = 0; i < n; i++) {
+    const b = bars[i];
+    b.m20 = m20[i]; b.dp = m200[i] ? (c[i] / m200[i] - 1) * 100 : null; b.macd = mac[i]; b.sig9 = sg[i];
+    if (m20[i] != null) { let s = 0; for (let j = i - 19; j <= i; j++) s += Math.pow(c[j] - m20[i], 2); const sd = Math.sqrt(s / 19); b.pb = sd ? (c[i] - (m20[i] - 2 * sd)) / (4 * sd) : null; } else b.pb = null;
+    if (i >= 13) { let hi = -1e18, lo = 1e18; for (let j = i - 13; j <= i; j++) { if (bars[j].h > hi) hi = bars[j].h; if (bars[j].l < lo) lo = bars[j].l; } rk.push(hi > lo ? (c[i] - lo) / (hi - lo) * 100 : null); } else rk.push(null);
+  }
+  const kk = [], dd = [];
+  for (let i = 0; i < n; i++) { const w = rk.slice(Math.max(0, i - 2), i + 1); kk.push(i >= 15 && w.length === 3 && w.indexOf(null) < 0 ? (w[0] + w[1] + w[2]) / 3 : null); }
+  for (let i = 0; i < n; i++) { const w = kk.slice(Math.max(0, i - 2), i + 1); dd.push(i >= 17 && w.length === 3 && w.indexOf(null) < 0 ? (w[0] + w[1] + w[2]) / 3 : null); }
+  let last = null;
+  for (let i = 0; i < n; i++) {
+    const b = bars[i], p = bars[i - 1]; b.k = kk[i]; b.dk = dd[i]; b.ss = 0; b.bs = 0;
+    if (b.rsi == null || b.pb == null || b.k == null || b.dp == null || !p || p.k == null || p.dk == null || b.dk == null) continue;
+    if (b.rsi >= NQ_S.rsi && b.pb >= NQ_S.pb && b.k >= NQ_S.k) { b.ss = 1; if (b.dp >= NQ_S.dp || (b.k < b.dk && p.k >= p.dk) || (b.macd < b.sig9 && p.macd >= p.sig9) || b.c < b.m20) b.ss = 2; }
+    if (b.rsi <= NQ_B.rsi && b.pb <= NQ_B.pb && b.k <= NQ_B.k) { b.bs = 1; if (b.dp <= NQ_B.dp || (b.k > b.dk && p.k <= p.dk) || (b.macd > b.sig9 && p.macd <= p.sig9) || b.pb > p.pb) b.bs = 2; }
+  }
+  for (let i = n - 1; i >= 0; i--) if (bars[i].ss || bars[i].bs) { last = bars[i]; break; }
+  const t = bars[n - 1], out = { asOf: t.d, c: r2(t.c), rsi: t.rsi == null ? null : r2(t.rsi), pb: t.pb == null ? null : r2(t.pb), k: t.k == null ? null : r2(t.k), dp: t.dp == null ? null : Math.round(t.dp * 10) / 10, alert: null };
+  if (last) { const sell = last.ss >= last.bs && last.ss > 0, lv = sell ? last.ss : last.bs; out.alert = { s: sell ? 'SELL' : 'BUY', lv: lv === 2 ? '확정' : '핵심', d: last.d, c: r2(last.c), rsi: r2(last.rsi), pb: r2(last.pb), k: r2(last.k), dp: Math.round(last.dp * 10) / 10 }; }
+  await cput('nqa', out, 3600); return out;
 }
 
 /* ===================== 라우터 / 스케줄 작업 ===================== */
