@@ -70,6 +70,7 @@
         return function () {
           var a = Array.prototype.slice.call(arguments), fn = String(name);
           while (a.length && a[a.length - 1] === undefined) a.pop();
+          if (fn === 'sim_get') a = a.slice(0, 1);
           var p = LOCAL[fn] ? LOCAL[fn].apply(null, a) : getJSON(dataUrl(fn, a));
           p.then(function (d) { if (ok) ok(d); }).catch(function (e) { if (err) err(e); });
         };
