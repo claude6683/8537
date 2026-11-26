@@ -25,6 +25,9 @@ jobs:
         run: node server/export.mjs
         env:
           FORCE: ${{ github.event.inputs.force }}
+      - name: 나스닥 일봉 수집 (nasdaq-alert)
+        run: |
+          node -e "fetch('https://query1.finance.yahoo.com/v8/finance/chart/%5EIXIC?range=10y&interval=1d',{headers:{'User-Agent':'Mozilla/5.0'}}).then(r=>r.json()).then(j=>{if(!(j&&j.chart&&j.chart.result))throw 1;require('fs').writeFileSync('data/ixic.json',JSON.stringify(j))}).catch(()=>console.log('ixic skip'))"
       - name: 변경분 커밋
         run: |
           git config user.name "github-actions[bot]"
