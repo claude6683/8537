@@ -544,7 +544,7 @@ async function gongdu_getData(date) {
 /* ===================== nasdaq-alert (나스닥 ^IXIC 5대 지표 경보, claude6683.github.io/nasdaq-alert 와 같은 계산) ===================== */
 const NQ_S = { rsi: 74, pb: 1, k: 90, dp: 14.9 }, NQ_B = { rsi: 28, pb: 0.05, k: 10, dp: -12.5 };
 async function nasdaqAlert() {
-  const hit = await cget('nqa', 3600); if (hit) return hit;
+  const hit = await cget('nqa2', 3600); if (hit) return hit;
   const r = await yc('^IXIC', '10y', '1d'); if (!r) throw new Error('나스닥 시세 조회 실패');
   const q = r.indicators.quote[0], off = r.meta.gmtoffset || 0, bars = [];
   r.timestamp.forEach((t, k) => { if (q.close[k] == null || q.open[k] == null || q.high[k] == null || q.low[k] == null) return; bars.push({ d: new Date((t + off) * 1000).toISOString().slice(0, 10), h: q.high[k], l: q.low[k], c: q.close[k] }); });
@@ -579,7 +579,9 @@ async function nasdaqAlert() {
   for (let i = n - 1; i >= 0; i--) if (bars[i].ss || bars[i].bs) { last = bars[i]; break; }
   const t = bars[n - 1], out = { asOf: t.d, c: r2(t.c), rsi: t.rsi == null ? null : r2(t.rsi), pb: t.pb == null ? null : r2(t.pb), k: t.k == null ? null : r2(t.k), dp: t.dp == null ? null : Math.round(t.dp * 10) / 10, alert: null };
   if (last) { const sell = last.ss >= last.bs && last.ss > 0, lv = sell ? last.ss : last.bs; out.alert = { s: sell ? 'SELL' : 'BUY', lv: lv === 2 ? '확정' : '핵심', d: last.d, c: r2(last.c), rsi: r2(last.rsi), pb: r2(last.pb), k: r2(last.k), dp: Math.round(last.dp * 10) / 10 }; }
-  await cput('nqa', out, 3600); return out;
+  out.recent = [];
+  for (let i = n - 1; i >= 0 && out.recent.length < 3; i--) { const b = bars[i]; if (!(b.ss || b.bs)) continue; const sell = b.ss >= b.bs && b.ss > 0, lv = sell ? b.ss : b.bs; out.recent.push({ s: sell ? 'SELL' : 'BUY', lv: lv === 2 ? '확정' : '핵심', d: b.d, c: r2(b.c), rsi: r2(b.rsi), pb: r2(b.pb), k: r2(b.k), dp: Math.round(b.dp * 10) / 10 }); }
+  await cput('nqa2', out, 3600); return out;
 }
 
 /* ===================== 라우터 / 스케줄 작업 ===================== */
