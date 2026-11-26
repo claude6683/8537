@@ -148,7 +148,7 @@ function render(d) {
        '<div class="card"><h2>오늘의 뉴스 10</h2>' +
        (b.news.length ? '<ul class="news">' + b.news.map((n, i) =>
          '<li><span class="n">' + (i + 1) + '</span>' + (i < 3 ? '<span class="top">TOP</span>' : '') +
-         '<a href="' + esc(n.l) + '" target="_blank" rel="noopener">' + esc(n.t) + '</a><span class="s">' + esc(n.s) + '</span></li>'
+         '<a href="' + esc(/^https?:/i.test(n.l) ? n.l : '#') + '" target="_blank" rel="noopener">' + esc(n.t) + '</a><span class="s">' + esc(n.s) + '</span></li>'
        ).join('') + '</ul>' : '<div class="empty">뉴스를 불러오지 못했습니다.</div>') + '</div></div>';
   h += '<div class="card"><h2>' + (b.weekend ? '다음 주 미리보기' : '다음 일정 체크포인트') + '</h2>' +
        (b.sched.length ? '<ul class="sched">' + b.sched.map(s =>
