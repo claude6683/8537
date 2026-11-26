@@ -1297,7 +1297,7 @@ function txDraw(id){
     v.forEach(function(c, k){
       var e = SG.ev[off0 + k]; if (!e) return;
       var ep = e.indexOf('→') > 0 ? e.split(' → ') : null, tr = !!ep && ep.length === 2 && RKT[ep[0]] != null && RKT[ep[1]] != null;
-      var x = k * bw + bw / 2, isB = e === 'BUY' || e === 'ADD' || e.indexOf('→') > 0, col = e === 'ADD' ? '#16a34a' : (tr ? (RKT[ep[1]] > RKT[ep[0]] ? up : dn) : (isB ? up : dn)), y = Y(isB ? c.l : c.h);
+      var x = k * bw + bw / 2, isB = e === 'BUY' || e === 'ADD' || e.indexOf('→') > 0 || e === 'buy1단계' || e === 'buy 확정', col = e === 'ADD' ? '#16a34a' : (tr ? (RKT[ep[1]] > RKT[ep[0]] ? up : dn) : (isB ? up : dn)), y = Y(isB ? c.l : c.h);
       g.font = 'bold 10px sans-serif'; var tw0 = g.measureText(e).width + 12, ty = null;
       for (var kk = 0; kk < 8 && ty == null; kk++) [isB ? 1 : -1, isB ? -1 : 1].forEach(function(sd){
         if (ty != null) return;
