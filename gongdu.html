@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>공두일보</title>
+<script src="/shim.js"></script>
+<style>
+  :root {
+    --bg: #f6f7fa; --panel: #ffffff; --panel2: #eef0f4; --line: #e3e6ec;
+    --ink: #212633; --ink2: #4d5565; --ink3: #7f8793;
+    --buy: #E8323C; --buy-bg: rgba(232,50,60,.09);
+    --sell: #2F6BDB; --sell-bg: rgba(47,107,219,.09);
+    --navy: #1b1f2d; --vix: #6d4fd6;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font-family: 'Noto Sans KR', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+         font-size: 14px; line-height: 1.5; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+  h2 { font-size: 15px; margin: 0 0 10px; font-weight: 700; }
+  header.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 12px; }
+  .title { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .title h1 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em; }
+  .title .date { color: var(--ink2); font-weight: 600; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+  .b-weekend { background: var(--navy); color: #fff; }
+  .ctrl { display: flex; align-items: center; gap: 8px; color: var(--ink3); font-size: 12px; }
+  select { font: inherit; font-size: 13px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+  .head { background: var(--navy); color: #fff; border: 0; }
+  .head .hl { font-size: 17px; font-weight: 700; margin-bottom: 10px; }
+  .head .k3 { font-size: 12px; color: #aab0bc; font-weight: 700; margin-bottom: 4px; }
+  .head ol { margin: 0; padding-left: 20px; }
+  .head li { font-weight: 700; margin: 3px 0; }
+  .head li .red { color: #ff5a63; font-weight: 800; }
+  .idx { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+  .ix { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+  .ix .t { padding: 12px 12px 10px; flex: 1; }
+  .ix .k { font-size: 12px; color: var(--ink3); font-weight: 700; }
+  .ix .v { font-size: 20px; font-weight: 800; letter-spacing: -.02em; margin-top: 2px; white-space: nowrap; }
+  .ix .c { font-size: 13px; font-weight: 700; }
+  .ix .b { background: var(--panel2); padding: 8px 12px; font-size: 12px; color: var(--ink2); }
+  .up { color: var(--buy); } .down { color: var(--sell); } .flat { color: var(--ink3); }
+  .two { display: grid; grid-template-columns: 2fr 3fr; gap: 12px; }
+  .sigbig { font-size: 30px; font-weight: 800; letter-spacing: -.02em; padding: 10px 0 4px; }
+  .sigbig.BUY { color: var(--buy); } .sigbig.SELL { color: var(--sell); }
+  .sub { color: var(--ink2); font-size: 12px; }
+  .cols { display: grid; grid-template-columns: 3fr 2fr; gap: 12px; align-items: start; }
+  .news { list-style: none; margin: 0; padding: 0; }
+  .news li { display: flex; gap: 8px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .news li:last-child { border-bottom: 0; }
+  .news .n { color: var(--ink3); font-weight: 700; min-width: 18px; }
+  .news .top { background: var(--buy); color: #fff; font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 4px; }
+  .news a { color: var(--ink); text-decoration: none; flex: 1; }
+  .news a:hover { color: var(--sell); }
+  .news .s { color: var(--ink3); font-size: 11px; white-space: nowrap; }
+  .sched { list-style: none; margin: 0; padding: 0; }
+  .sched li { padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .sched li:last-child { border-bottom: 0; }
+  .sched .w { color: var(--ink3); font-size: 12px; font-weight: 700; }
+  .sched .fp { color: var(--ink3); font-size: 12px; }
+  .empty { color: var(--ink3); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--ink3); font-weight: 700; font-size: 12px; background: var(--panel2); }
+  td:first-child { font-weight: 700; white-space: nowrap; }
+  .tbl { overflow-x: auto; margin-bottom: 12px; }
+  .conds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+  .cond { background: var(--panel2); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+  .cond b { display: block; font-size: 12px; color: var(--ink3); margin-bottom: 4px; }
+  .reason { font-size: 13px; color: var(--ink2); }
+  footer { color: var(--ink3); font-size: 12px; text-align: center; padding: 8px 0 24px; }
+  #msg { padding: 60px 0; text-align: center; color: var(--ink3); }
+  /* VIX 차트 */
+  .vh { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .vh .nm { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: var(--vix); }
+  .vq { font-weight: 800; font-variant-numeric: tabular-nums; }
+  .tabs { display: inline-flex; gap: 4px; background: var(--panel2); padding: 3px; border-radius: 9px; }
+  .tabs button { border: 0; background: transparent; color: var(--ink2); font: inherit; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 7px; cursor: pointer; }
+  .tabs button.on { background: var(--panel); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }
+  .vtools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 4px; }
+  #vcv { display: block; width: 100%; height: 230px; touch-action: none; cursor: crosshair; }
+  .vhint { color: var(--ink3); font-size: 11px; margin-top: 2px; }
+  @media (max-width: 760px) {
+    .idx { grid-template-columns: repeat(2, 1fr); }
+    .idx .ix:first-child { grid-column: 1 / -1; }
+    .cols, .conds, .two { grid-template-columns: 1fr; }
+    .title h1 { font-size: 19px; }
+    .ix .v { font-size: 18px; }
+    .wrap { padding: 8px; }
+    .card { padding: 13px; }
+    #vcv { height: 200px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="msg">불러오는 중…</div>
+  <div id="view"></div>
+</div>
+<script>
+let DATES = [];
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
+function mark(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, '<span class="red">$1</span>'); }
+function cls(v) { return v > 0 ? 'up' : v < 0 ? 'down' : 'flat'; }
+function pct(v) { return (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%'; }
+
+function tripodHtml(t) {
+  let left, right;
+  if (t && t.now) {
+    left = '<div class="card"><h2>Tripod 현재 시그널</h2><div class="sigbig ' + esc(t.now.s) + '">' + esc(t.now.label) + '</div>' +
+           '<div class="sub">발생 ' + esc(t.now.since) + (t.hold ? ' · 현재 보유 ' + esc(t.hold) : '') + '</div></div>';
+  } else left = '<div class="card"><h2>Tripod 현재 시그널</h2><div class="empty">시그널을 불러오지 못했습니다.</div></div>';
+  if (t && t.trades && t.trades.length) {
+    right = '<div class="card"><h2>시그널 거래내역 (최근 3건)</h2><div class="tbl" style="margin:0"><table><tr><th>발생일</th><th>시그널</th><th>QQQ 가격</th><th>52주 고점 대비</th><th>VIX</th></tr>' +
+      t.trades.map(r => '<tr><td>' + esc(r.d) + '</td><td class="' + (r.s === 'BUY' ? 'up' : 'down') + '" style="font-weight:700">' + esc(r.label) + '</td><td>' +
+        (r.p == null ? '-' : '$' + r.p.toFixed(2)) + '</td><td class="' + (r.dd == null ? '' : cls(r.dd)) + '">' + (r.dd == null ? '-' : pct(r.dd)) + '</td><td>' + (r.vx == null ? '-' : r.vx.toFixed(2)) + '</td></tr>').join('') +
+      '</table></div></div>';
+  } else right = '<div class="card"><h2>시그널 거래내역 (최근 3건)</h2><div class="empty">거래 내역이 없습니다.</div></div>';
+  return '<div class="two">' + left + right + '</div>';
+}
+
+function render(d) {
+  DATES = d.dates; const b = d.b;
+  if (!b) { document.getElementById('msg').textContent = '브리핑이 아직 없습니다.'; return; }
+  const opt = DATES.map(x => '<option value="' + esc(x) + '"' + (x === b.date ? ' selected' : '') + '>' + esc(x) + '</option>').join('');
+  let h = '';
+  h += '<header class="top"><div class="title"><h1>공두일보</h1><span class="date">' + esc(b.dateLabel) + '</span>' +
+       (b.weekend ? '<span class="badge b-weekend">주말판</span>' : '') + '</div>' +
+       '<div class="ctrl">지난 브리핑 <select onchange="load(this.value)">' + opt + '</select></div></header>';
+  h += '<div class="card head"><div class="hl">' + esc(b.headline) + '</div><div class="k3">오늘 꼭 알아야 할 3줄</div><ol>' +
+       b.lines.map(l => '<li>' + mark(l) + '</li>').join('') + '</ol></div>';
+  h += '<div class="idx">' + b.idx.map(x => {
+    const c = x.chgBp !== undefined
+      ? '<span class="c ' + cls(x.chgBp) + '">' + (x.chgBp >= 0 ? '+' : '') + x.chgBp.toFixed(1) + 'bp</span>'
+      : '<span class="c ' + cls(x.chg) + '">' + pct(x.chg) + '</span>';
+    return '<div class="ix"><div class="t"><div class="k">' + esc(x.k) + '</div><div class="v">' + esc(x.v) + '</div>' + c +
+           '</div><div class="b">' + esc(x.sub) + '</div></div>';
+  }).join('') + '</div><div style="height:12px"></div>';
+  h += tripodHtml(b.tripod);
+  h += '<div class="cols"><div>' +
+       '<div class="card"><div class="vh"><span class="nm"><i class="dot"></i>VIX 변동성지수 <span class="vq" id="vq"></span></span>' +
+       '<span class="tabs" id="vtabs"></span></div>' +
+       '<div class="vtools"><span class="tabs" id="vmode"></span><span class="tabs"><button data-z="in">＋ 확대</button><button data-z="out">－ 축소</button><button data-z="reset">초기화</button></span></div>' +
+       '<canvas id="vcv"></canvas><div class="vhint">휠로 확대·축소 · 끌어서 이동 · 더블클릭 초기화 · 모바일은 두 손가락 · 기준 = 마지막 종가</div></div>' +
+       '<div class="card"><h2>오늘의 뉴스 10</h2>' +
+       (b.news.length ? '<ul class="news">' + b.news.map((n, i) =>
+         '<li><span class="n">' + (i + 1) + '</span>' + (i < 3 ? '<span class="top">TOP</span>' : '') +
+         '<a href="' + esc(n.l) + '" target="_blank" rel="noopener">' + esc(n.t) + '</a><span class="s">' + esc(n.s) + '</span></li>'
+       ).join('') + '</ul>' : '<div class="empty">뉴스를 불러오지 못했습니다.</div>') + '</div></div>';
+  h += '<div class="card"><h2>' + (b.weekend ? '다음 주 미리보기' : '다음 일정 체크포인트') + '</h2>' +
+       (b.sched.length ? '<ul class="sched">' + b.sched.map(s =>
+         '<li><div class="w">' + esc(s.when) + ' (KST)</div><div>' + esc(s.t) + '</div>' +
+         ((s.f || s.p) ? '<div class="fp">예상 ' + esc(s.f || '-') + ' · 이전 ' + esc(s.p || '-') + '</div>' : '') + '</li>'
+       ).join('') + '</ul>' : '<div class="empty">예정된 미국 주요 지표가 없습니다.</div>') + '</div></div>';
+  const o = b.opinion;
+  h += '<div class="card"><h2>공두일보 투자의견</h2>' +
+       '<div class="tbl"><table><tr><th>지표</th><th>값</th><th>판단</th></tr>' +
+       o.table.map(r => '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td><td>' + esc(r[2]) + '</td></tr>').join('') +
+       '</table></div><div class="conds">' +
+       '<div class="cond"><b>보유자</b>' + esc(o.holder) + '</div>' +
+       '<div class="cond"><b>신규 매수</b>' + esc(o.newBuy) + '</div>' +
+       '<div class="cond"><b>의견 변경 조건</b>' + esc(o.change) + '</div></div>' +
+       '<div class="reason"><b>근거</b> ' + esc(o.reason) + '</div></div>';
+  h += '<footer>출처: ' + esc(b.sources) + '<br>생성 ' + esc(b.builtAt) + ' (KST) · 참고용 · 투자 권유 아님</footer>';
+  document.getElementById('view').innerHTML = h;
+  document.getElementById('msg').style.display = 'none';
+  vInit();
+}
+
+function load(date) {
+  document.getElementById('msg').style.display = 'block';
+  google.script.run
+    .withSuccessHandler(render)
+    .withFailureHandler(e => { document.getElementById('msg').textContent = '불러오기 실패: ' + (e && e.message ? e.message : e); })
+    .gongdu_getData(date || '');
+  window.scrollTo(0, 0);
+}
+
+/* ===== VIX 변동성지수 차트 (VIX 시그널 탭 상단 차트와 같은 데이터) ===== */
+const TFS = [
+  ['1h', '1시간', 'h', t => Math.floor(t / 3600)], ['4h', '4시간', 'h', t => Math.floor(t / 14400)],
+  ['1d', '1일', 'd', t => Math.floor(t / 86400)], ['1w', '1주', 'w', t => Math.floor((t / 86400 + 3) / 7)],
+  ['1mo', '1달', 'm', t => { const d = new Date(t * 1000); return d.getUTCFullYear() * 12 + d.getUTCMonth(); }]
+];
+const VC = { tf: '1h', raw: null, live: null, v0: 0, v1: 0, hov: null, hy: null, pct: true, ptr: new Map(), pd: 0, drag: null };
+const VBARS = 160, PADR = 92;
+function agg(pts, key) { const out = []; for (const [t, c] of pts) { const k = key(t), l = out[out.length - 1]; if (l && l.k === k) { l.t = t; l.c = c; } else out.push({ k, t, c }); } return out; }
+function vSeries() {
+  if (!VC.raw) return { t: [], v: [] };
+  const tf = TFS.find(x => x[0] === VC.tf), a = agg(VC.raw[tf[2]] || [], tf[3]);
+  const t = a.map(x => x.t), v = a.map(x => x.c);
+  if (VC.live != null && v.length) v[v.length - 1] = VC.live;
+  return { t, v };
+}
+function vReset() { const n = vSeries().t.length; VC.v1 = n - 1; VC.v0 = Math.max(0, n - VBARS); }
+function fmtT(t) {
+  const o = VC.tf === '1mo' ? { year: 'numeric', month: '2-digit' } : (VC.tf === '1d' || VC.tf === '1w') ? { year: '2-digit', month: '2-digit', day: '2-digit' } : { month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false };
+  return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', ...o }).format(new Date(t * 1000));
+}
+function vTabs() {
+  const a = document.getElementById('vtabs'), m = document.getElementById('vmode'); if (!a) return;
+  a.innerHTML = TFS.map(x => '<button data-tf="' + x[0] + '" class="' + (x[0] === VC.tf ? 'on' : '') + '">' + x[1] + '</button>').join('');
+  m.innerHTML = '<button data-m="p" class="' + (VC.pct ? '' : 'on') + '">가격</button><button data-m="r" class="' + (VC.pct ? 'on' : '') + '">%</button>';
+}
+function vDraw() {
+  const cv = document.getElementById('vcv'); if (!cv) return;
+  const s = vSeries(), n = s.t.length; if (n < 2) return;
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (cv.width !== W * dpr || cv.height !== H * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+  const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
+  const base = s.v[n - 1], val = v => VC.pct ? (v / base - 1) * 100 : v;
+  const i0 = Math.max(0, Math.floor(VC.v0)), i1 = Math.min(n - 1, Math.ceil(VC.v1));
+  let lo = Infinity, hi = -Infinity;
+  for (let i = i0; i <= i1; i++) { const q = val(s.v[i]); if (q < lo) lo = q; if (q > hi) hi = q; }
+  const mg = (hi - lo) * 0.08 || 1; lo -= mg; hi += mg;
+  const padB = 20, padT = 8, pw = W - PADR, ph = H - padT - padB, rg = Math.max(1e-6, VC.v1 - VC.v0);
+  const X = i => (i - VC.v0) / rg * (pw - 6) + 3, Y = q => padT + (hi - q) / (hi - lo) * ph;
+  const lab = q => VC.pct ? (q >= 0 ? '+' : '') + q.toFixed(2) + '%' : q.toFixed(2);
+  const css = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim(), line = css('--line'), ink3 = css('--ink3'), col = css('--vix');
+  x.font = '11px system-ui, sans-serif'; x.textBaseline = 'middle'; x.strokeStyle = line; x.fillStyle = ink3; x.textAlign = 'left'; x.lineWidth = 1;
+  for (let k = 0; k <= 4; k++) { const q = lo + (hi - lo) * k / 4, y = Math.round(Y(q)) + .5; x.beginPath(); x.moveTo(0, y); x.lineTo(pw, y); x.stroke(); x.fillText(lab(q), pw + 8, y); }
+  if (VC.pct && lo < 0 && hi > 0) { const y = Math.round(Y(0)) + .5; x.setLineDash([4, 3]); x.strokeStyle = ink3; x.beginPath(); x.moveTo(0, y); x.lineTo(pw, y); x.stroke(); x.setLineDash([]); }
+  x.textAlign = 'center'; x.textBaseline = 'alphabetic';
+  const ticks = Math.max(2, Math.floor(pw / 150));
+  for (let k = 0; k < ticks; k++) { const idx = Math.round(VC.v0 + (k + .5) / ticks * rg); if (idx >= 0 && idx < n) x.fillText(fmtT(s.t[idx]), X(idx), H - 5); }
+  x.save(); x.beginPath(); x.rect(0, 0, pw, H); x.clip();
+  x.beginPath(); let st = false;
+  for (let i = Math.max(0, i0 - 1); i <= Math.min(n - 1, i1 + 1); i++) { const px = X(i), py = Y(val(s.v[i])); if (!st) { x.moveTo(px, py); st = true; } else x.lineTo(px, py); }
+  x.strokeStyle = col; x.lineWidth = 2; x.lineJoin = 'round'; x.stroke();
+  x.lineTo(X(Math.min(n - 1, i1 + 1)), padT + ph); x.lineTo(X(Math.max(0, i0 - 1)), padT + ph); x.closePath();
+  const gr = x.createLinearGradient(0, padT, 0, padT + ph); gr.addColorStop(0, col + '38'); gr.addColorStop(1, col + '00'); x.fillStyle = gr; x.fill();
+  x.restore();
+  const ly = Y(val(base));
+  if (ly >= padT && ly <= padT + ph) { x.fillStyle = col; x.beginPath(); x.roundRect(pw + 3, ly - 9, PADR - 5, 18, 4); x.fill(); x.fillStyle = '#fff'; x.textAlign = 'left'; x.textBaseline = 'middle'; x.font = '600 11px system-ui, sans-serif'; x.fillText(lab(val(base)), pw + 8, ly + .5); }
+  if (VC.hov != null && VC.hov >= 0 && VC.hov < n) {
+    const hi_ = VC.hov, hx = X(hi_), hv = s.v[hi_], hy = Y(val(hv)), hp = (hv / base - 1) * 100;
+    x.strokeStyle = ink3; x.lineWidth = 1; x.setLineDash([4, 3]);
+    x.beginPath(); x.moveTo(Math.round(hx) + .5, padT); x.lineTo(Math.round(hx) + .5, padT + ph); x.stroke();
+    if (VC.hy != null && VC.hy >= padT && VC.hy <= padT + ph) {
+      x.beginPath(); x.moveTo(0, Math.round(VC.hy) + .5); x.lineTo(pw, Math.round(VC.hy) + .5); x.stroke(); x.setLineDash([]);
+      const yq = hi - (VC.hy - padT) / ph * (hi - lo), yp = VC.pct ? yq : (yq / base - 1) * 100, ytxt = VC.pct ? lab(yq) + ' · ' + (base * (1 + yq / 100)).toFixed(2) : yq.toFixed(2) + ' · ' + (yp >= 0 ? '+' : '') + yp.toFixed(2) + '%';
+      x.fillStyle = '#2a2e39'; x.beginPath(); x.roundRect(pw + 3, VC.hy - 9, PADR - 5, 18, 4); x.fill();
+      x.fillStyle = '#fff'; x.font = '600 10px system-ui, sans-serif'; x.textAlign = 'left'; x.textBaseline = 'middle'; x.fillText(ytxt, pw + 6, VC.hy + .5);
+    }
+    x.setLineDash([]); x.fillStyle = col; x.strokeStyle = '#fff'; x.lineWidth = 2; x.beginPath(); x.arc(hx, hy, 5, 0, 7); x.fill(); x.stroke();
+    const tl = [fmtT(s.t[hi_]), '가격 ' + hv.toFixed(2), '종가 대비 ' + (hp >= 0 ? '+' : '') + hp.toFixed(2) + '%'], bw = 132, bh = 54;
+    let bx = hx + 12, by = padT + 6; if (bx + bw > pw) bx = hx - bw - 12;
+    x.fillStyle = 'rgba(33,38,51,.92)'; x.beginPath(); x.roundRect(bx, by, bw, bh, 6); x.fill();
+    x.fillStyle = '#fff'; x.textAlign = 'left'; x.textBaseline = 'middle'; x.font = '600 11px system-ui, sans-serif';
+    tl.forEach((t, k) => { x.fillStyle = k === 2 ? (hp >= 0 ? '#ff7a82' : '#7fa8ff') : '#fff'; x.fillText(t, bx + 8, by + 12 + k * 15); });
+  }
+  const q = document.getElementById('vq');
+  if (q) { const prev = s.v[n - 2], d = (base / prev - 1) * 100; q.innerHTML = base.toFixed(2) + ' <span class="' + (d >= 0 ? 'up' : 'down') + '">' + (d >= 0 ? '▲ +' : '▼ ') + d.toFixed(2) + '%</span>'; }
+  cv._g = { pw: pw, padT: padT, ph: ph, n: n };
+}
+function vZoom(f, cx) {
+  const cv = document.getElementById('vcv'), g = cv && cv._g; if (!g) return;
+  const n = g.n, rg = VC.v1 - VC.v0, fp = VC.v0 + ((cx == null ? g.pw / 2 : cx) - 3) / (g.pw - 6) * rg;
+  const nr = Math.min(n - 1, Math.max(8, rg * f)); let a = fp - (fp - VC.v0) * nr / rg, b = a + nr;
+  if (a < 0) { b -= a; a = 0; } if (b > n - 1) { a -= b - (n - 1); b = n - 1; if (a < 0) a = 0; }
+  VC.v0 = a; VC.v1 = b; vDraw();
+}
+function vPan(dx) {
+  const cv = document.getElementById('vcv'), g = cv && cv._g; if (!g) return;
+  const rg = VC.v1 - VC.v0, di = dx / (g.pw - 6) * rg; let a = VC.v0 - di, b = VC.v1 - di;
+  if (a < 0) { b -= a; a = 0; } if (b > g.n - 1) { a -= b - (g.n - 1); b = g.n - 1; }
+  VC.v0 = Math.max(0, a); VC.v1 = b; vDraw();
+}
+function vInit() {
+  vTabs();
+  const cv = document.getElementById('vcv'); if (!cv) return;
+  document.getElementById('vtabs').onclick = e => { const b = e.target.closest('[data-tf]'); if (b) { VC.tf = b.dataset.tf; VC.hov = null; vReset(); vTabs(); vDraw(); } };
+  document.getElementById('vmode').onclick = e => { const b = e.target.closest('[data-m]'); if (b) { VC.pct = b.dataset.m === 'r'; vTabs(); vDraw(); } };
+  cv.parentNode.querySelector('.vtools').onclick = e => { const b = e.target.closest('[data-z]'); if (!b) return; if (b.dataset.z === 'reset') { vReset(); vDraw(); } else vZoom(b.dataset.z === 'in' ? 0.7 : 1.4); };
+  cv.addEventListener('wheel', e => { e.preventDefault(); const r = cv.getBoundingClientRect(); vZoom(e.deltaY < 0 ? 0.85 : 1.18, e.clientX - r.left); }, { passive: false });
+  cv.addEventListener('dblclick', () => { vReset(); vDraw(); });
+  cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); VC.ptr.set(e.pointerId, e.clientX); VC.drag = e.clientX; VC.pd = 0; });
+  cv.addEventListener('pointermove', e => {
+    const r = cv.getBoundingClientRect(), g = cv._g; if (!g) return;
+    if (VC.ptr.has(e.pointerId)) VC.ptr.set(e.pointerId, e.clientX);
+    if (VC.ptr.size >= 2) { const xs = [...VC.ptr.values()], d = Math.abs(xs[0] - xs[1]); if (VC.pd) vZoom(VC.pd / Math.max(10, d), (xs[0] + xs[1]) / 2 - r.left); VC.pd = d; return; }
+    if (e.buttons && VC.drag != null && e.pointerType !== 'touch') { vPan(e.clientX - VC.drag); VC.drag = e.clientX; }
+    else if (e.pointerType === 'touch' && VC.drag != null) { vPan(e.clientX - VC.drag); VC.drag = e.clientX; }
+    const rg = VC.v1 - VC.v0; VC.hov = Math.max(0, Math.min(g.n - 1, Math.round(VC.v0 + (e.clientX - r.left - 3) / (g.pw - 6) * rg))); VC.hy = e.clientY - r.top; vDraw();
+  });
+  const up = e => { VC.ptr.delete(e.pointerId); VC.drag = null; VC.pd = 0; };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  cv.addEventListener('pointerleave', () => { VC.hov = null; VC.hy = null; vDraw(); });
+  if (VC.raw) { vDraw(); } else vLoad(true);
+}
+function vLoad(first) {
+  google.script.run.withSuccessHandler(d => {
+    if (!d || !d.VIX || !d.VIX.h || !d.VIX.h.length) return;
+    const old = vSeries().t.length, atEnd = VC.v1 >= old - 1.5, rg = VC.v1 - VC.v0;
+    VC.raw = d.VIX; VC.live = (d.live && d.live.VIX) || null;
+    if (first || !old) vReset(); else { const n = vSeries().t.length; if (atEnd) { VC.v1 = n - 1; VC.v0 = Math.max(0, VC.v1 - rg); } }
+    vDraw();
+  }).gongdu_vix();
+}
+window.addEventListener('resize', vDraw);
+setInterval(() => vLoad(false), 60 * 1000);
+load('');
+setInterval(() => { if (!DATES.length || (document.querySelector('select') && document.querySelector('select').value === DATES[0])) load(''); }, 10 * 60 * 1000);
+</script>
+</body>
+</html>

@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script src="/shim.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trading</title>
+<style>
+  :root {
+    --bg: #f6f7fa; --panel: #ffffff; --panel2: #eef0f4; --line: #e3e6ec;
+    --ink: #212633; --ink2: #4d5565; --ink3: #7f8793;
+    --buy: #E8323C; --buy-bg: rgba(232,50,60,.09);      /* 상승·BUY = 빨강 */
+    --sell: #2F6BDB; --sell-bg: rgba(47,107,219,.09);   /* 하락·SELL = 파랑 */
+    --hold: #8a6d1f; --hold-bg: rgba(138,109,31,.10);
+    --vix: #6d4fd6; --qqq: #d9822b;   /* --vix = Fear 지수 선, --qqq = BTC 선 */
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: 'Noto Sans KR', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    font-size: 14px; line-height: 1.45;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 12px; }
+
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin-bottom: 14px; }
+  h1 { font-size: 18px; margin: 0; font-weight: 700; letter-spacing: -.01em; }
+  .quotes { display: flex; gap: 20px; flex-wrap: wrap; }
+  .quote { display: flex; align-items: baseline; gap: 8px; }
+  .quote .sym { display: inline-flex; align-items: center; gap: 6px; color: var(--ink2); font-weight: 600; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .quote .px { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .quote .chg { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .up { color: var(--buy); } .down { color: var(--sell); }
+  .status { margin-left: auto; display: flex; align-items: center; gap: 10px; color: var(--ink3); font-size: 12px; }
+  .badge { padding: 3px 9px; border-radius: 999px; font-weight: 700; font-size: 12px; border: 1px solid var(--line); color: var(--ink2); }
+  .badge.live { color: #0e8f6e; border-color: #0e8f6e; }
+  .badge.demo { color: var(--hold); border-color: var(--hold); }
+
+  .signals { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 14px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 14px 13px; cursor: pointer; text-align: left; color: inherit; font: inherit;
+    transition: border-color .15s;
+  }
+  .card:hover { border-color: var(--ink3); }
+  .card.sel { border-color: var(--ink2); box-shadow: 0 0 0 1px var(--ink2) inset; }
+  .card .tf { color: var(--ink2); font-weight: 600; font-size: 13px; display: flex; justify-content: space-between; }
+  .card .tf span { color: var(--ink3); font-weight: 500; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .sig {
+    margin: 9px 0 10px; border-radius: 9px; padding: 9px 0; text-align: center;
+    font-size: 25px; font-weight: 800; letter-spacing: .04em;
+  }
+  .sig small { font-size: 15px; margin-right: 6px; vertical-align: 2px; }
+  .sig.BUY { color: var(--buy); background: var(--buy-bg); }
+  .sig.SELL { color: var(--sell); background: var(--sell-bg); }
+  .sig.HOLD { color: var(--hold); background: var(--hold-bg); }
+  .meter { position: relative; height: 14px; border-radius: 7px; background: var(--panel2); overflow: visible; }
+  .meter i { position: absolute; top: 0; height: 14px; font: 700 9px/14px system-ui, sans-serif; letter-spacing: .08em; text-align: center; color: rgba(255,255,255,.92); }
+  .meter .zs { background: color-mix(in srgb, var(--sell) 55%, transparent); border-radius: 0 7px 7px 0; }
+  .meter .zb { left: 0; background: color-mix(in srgb, var(--buy) 55%, transparent); border-radius: 7px 0 0 7px; }
+  .meter b { position: absolute; top: -4px; width: 4px; height: 22px; margin-left: -2px; border-radius: 2px; background: var(--ink); box-shadow: 0 0 0 2px var(--panel); }
+  .meter em { text-shadow: 0 0 2px #fff, 0 0 2px #fff, 0 0 3px #fff; position: absolute; top: -3px; font-style: normal; font-size: 12px; line-height: 20px; }
+  .meter em.r { color: var(--sell); transform: translateX(5px); }
+  .meter em.l { color: var(--buy); transform: translateX(calc(-100% - 5px)); }
+  .why { margin-top: 9px; color: var(--ink3); font-size: 12px; }
+
+  .charts { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 8px; }
+  .chart-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .tabs { display: flex; gap: 4px; background: var(--panel2); padding: 3px; border-radius: 9px; }
+  .tabs button { border: 0; background: transparent; color: var(--ink2); font: inherit; font-weight: 600; padding: 5px 12px; border-radius: 7px; cursor: pointer; }
+  .tabs button.on { background: var(--panel); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }
+  .hint { color: var(--ink3); font-size: 12px; }
+  .pane-h { display: flex; align-items: baseline; gap: 10px; margin: 10px 0 2px; }
+  .pane-h .name { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+  .pane-h .val { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .pane-h .when { color: var(--ink3); font-size: 12px; font-variant-numeric: tabular-nums; }
+  canvas { display: block; width: 100%; height: 230px; touch-action: pan-y; }
+  .charts + .charts { margin-top: 14px; }
+  .wscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  #cW, #cR { height: 400px; min-width: 900px; }
+  #cVIX { height: 380px; }
+  .card { cursor: default; }
+  /* 신호 카드 5개: 폭은 그대로, 높이만 절반으로 */
+  .signals { gap: 8px; margin-bottom: 12px; }
+  .card { padding: 6px 10px 7px; border-radius: 10px; }
+  .card .tf { font-size: 12px; line-height: 1.3; }
+  .card .tf span { font-size: 11px; }
+  .sig { margin: 4px 0 6px; padding: 3px 0; font-size: 17px; line-height: 1.2; border-radius: 7px; }
+  .sig small { font-size: 11px; margin-right: 4px; vertical-align: 1px; }
+  .meter { height: 10px; border-radius: 5px; }
+  .meter i { height: 10px; font-size: 8px; line-height: 10px; }
+  .meter .zs { border-radius: 0 5px 5px 0; } .meter .zb { border-radius: 5px 0 0 5px; }
+  .meter b { top: -3px; height: 16px; }
+  .meter em { top: -5px; font-size: 10px; }
+  .why { display: none; }
+  #cQ { height: 400px; min-width: 900px; }
+  /* 맨 위 줄: Trading View 탭과 같은 모양의 제목 + Sound 버튼 */
+  .topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; margin-bottom: 12px; }
+  .topbar .ttl { font-size: 14px; font-weight: 700; margin: 0; white-space: nowrap; }
+  .snd-box { display:inline-flex; align-items:center; gap:10px; margin-left:16px; vertical-align:middle;
+             font-size:12px; font-weight:400; color:#7f8793; }
+  .snd-btn { font-family:inherit; font-size:13px; font-weight:600; line-height:1.2; border:1px solid #cfd3dc; background:#fff; color:#4b5260;
+             border-radius:999px; padding:5px 12px; cursor:pointer; white-space:nowrap; }
+  .snd-btn.on { background:#1b1f2d; color:#fff; border-color:#1b1f2d; }
+  .snd-last { font-variant-numeric:tabular-nums; white-space:nowrap; padding:2px 4px; border-radius:4px; }
+  .snd-last.flash { animation:sndf .7s ease-out; }
+  @keyframes sndf { from { background:#fff1a8; } to { background:transparent; } }
+  @media (max-width: 640px) { .snd-box { margin-left:8px; gap:6px; } .snd-last { display:none; } .snd-btn { font-size:12px; padding:4px 10px; } }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; color: var(--ink2); font-size: 12px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .wnote { color: var(--ink3); font-size: 12px; margin: 2px 0 4px; }
+  footer { color: var(--ink3); font-size: 12px; margin: 12px 2px 4px; }
+
+  @media (max-width: 860px) {
+    .signals { grid-template-columns: repeat(2, 1fr); }
+    .status { margin-left: 0; }
+    canvas { height: 190px; }
+  }
+
+  /* ===== Trading 탭 (지정가 모의거래) — Fear 탭 디자인 기준 ===== */
+  .tx-card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
+  .tx-hd { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 8px; }
+  .tx-nm { font-weight: 700; font-size: 16px; }
+  .tx-px { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tx-tfs { margin-left: auto; display: flex; gap: 4px; }
+  .tx-tf, .tx-chip { border: 1px solid var(--line); background: var(--panel2); color: var(--ink2); border-radius: 6px; padding: 3px 9px; font-size: 12px; cursor: pointer; font-family: inherit; }
+  .tx-tf.on, .tx-chip.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .tx-zbtn { border: 1px solid var(--line); background: var(--panel2); color: var(--ink2); border-radius: 6px; padding: 3px 9px; font-size: 12px; cursor: pointer; font-family: inherit; }
+  .tx-card canvas { width: 100%; height: 260px; display: block; }
+  .tx-ord { display: flex; gap: 8px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
+  .tx-ord label { display: flex; align-items: center; gap: 5px; color: var(--ink3); font-size: 12px; }
+  .tx-ord input { width: 110px; border: 1px solid var(--line); border-radius: 7px; padding: 7px 8px; font: inherit; font-size: 14px; color: var(--ink); background: #fff; }
+  .tx-btn { border: 0; border-radius: 8px; padding: 8px 18px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; color: #fff; }
+  .tx-btn.b { background: var(--buy); } .tx-btn.s { background: var(--sell); }
+  .tx-btn:disabled { opacity: .5; cursor: default; }
+  .tx-pl { margin-left: auto; text-align: right; font-weight: 700; }
+  .tx-pl small { display: block; color: var(--ink3); font-weight: 400; font-size: 12px; }
+  .tx-prev { color: var(--ink2); font-size: 12px; margin-top: 6px; min-height: 16px; }
+  .tx-memo { margin-top: 6px; background: var(--panel2); border-radius: 8px; padding: 7px 10px; font-size: 12px; color: var(--ink2); line-height: 1.55; }
+  .tx-memo b { color: var(--ink); }
+  .tx-up { color: var(--buy); } .tx-dn { color: var(--sell); } .tx-mu { color: var(--ink3); }
+  .tx-sec { font-weight: 700; margin: 0 0 8px; font-size: 15px; }
+  .tx-sum { display: flex; flex-wrap: wrap; gap: 6px 24px; align-items: baseline; margin-bottom: 10px; }
+  .tx-sum .k { color: var(--ink3); font-size: 12px; margin-right: 4px; }
+  .tx-sum small { color: var(--ink3); font-size: 11px; }
+  .tx-t { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tx-t th { text-align: right; color: var(--ink3); font-weight: 500; font-size: 12px; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+  .tx-t td { text-align: right; padding: 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .tx-t th:first-child, .tx-t td:first-child { text-align: left; }
+  .tx-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+  .tx-hl { padding: 6px 2px; border-bottom: 1px solid var(--line); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tx-ft { color: var(--ink3); font-size: 11px; margin-top: 6px; }
+  @media (max-width: 860px) { .tx-card canvas { height: 220px; } .tx-tfs { margin-left: 0; } .tx-ord input { width: 92px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="charts" style="margin-bottom:14px">
+    <div class="chart-top">
+      <div class="tabs" id="qTabs"></div>
+      <div class="hint" id="qHint">최종 전략(VIX 위기 필터, 일봉 기준): SELL = VIX 급등(20일평균 대비 1.15배↑·22↑)+200일선 아래 → SGOV 50%·VOO 50%로 방어 / BUY = VIX 16 이하 또는 20일평균 대비 0.9배↓ → 복귀 / ADD = 보유 중 VIX 급등인데 200일선 위(눌림) → 투입금 추가(2배), 한 번 뜬 신호는 유지 · QQQM 은 미국 장이 열린 시간에만 거래되어, 장이 닫혀 있으면 마지막 장의 데이터가 보입니다</div>
+    </div>
+    <div class="pane-h"><span class="name"><i class="dot" style="background:var(--qqq)"></i>QQQM 실시간 차트</span><span class="val" id="hvQ"></span><span class="when" id="hwQ"></span></div>
+    <div class="wscroll" id="qscroll"><canvas id="cQ"></canvas></div>
+  </section>
+
+  <div id="txcards"></div>
+  <div class="tx-card"><div class="tx-sec">포지션 · 손익현황</div>
+    <div class="tx-sum" id="txsum"></div>
+    <div style="overflow-x:auto"><table class="tx-t" id="txptab"></table></div></div>
+  <div class="tx-card"><div class="tx-sec">거래내역 <span class="tx-mu" style="font-weight:400;font-size:12px">(마감된 거래 · 최근 100개)</span></div>
+    <div class="tx-chips" id="txhchips"></div><div id="txhist"></div>
+    <div class="tx-ft"><button class="tx-chip" id="txrst">전체 초기화</button> <span id="txrmsg"></span></div></div>
+  <div class="tx-ft" id="txftr"></div>
+
+<div id="fagstub" style="display:none">
+  <div class="topbar">
+    <h1 class="ttl">Fear &amp; Greed Index</h1>
+    <span class="snd-box"><button id="sndBuyBtn" type="button" class="snd-btn" onclick="alToggle('buy')"></button><span id="sndBuyLast" class="snd-last"></span></span>
+    <span class="snd-box"><button id="sndSellBtn" type="button" class="snd-btn" onclick="alToggle('sell')"></button><span id="sndSellLast" class="snd-last"></span></span>
+  </div>
+  <header>
+    <div class="quotes">
+      <div class="quote"><span class="sym"><i class="dot" style="background:var(--vix)"></i>Fear</span><span class="px" id="pxVIX">–</span><span class="chg" id="chgVIX"></span></div>
+      <div class="quote"><span class="sym"><i class="dot" style="background:var(--qqq)"></i>BTC</span><span class="px" id="pxQQQ">–</span><span class="chg" id="chgQQQ"></span></div>
+      <div class="quote"><span class="sym"><i class="dot" style="background:#8e6bd8"></i>MVRV</span><span class="px" id="pxMVRV">–</span><span class="chg" id="chgMVRV"></span></div>
+    </div>
+    <div class="status"><span id="updated"></span><span class="badge" id="mode">연결 중</span></div>
+  </header>
+
+  <section class="signals" id="signals"></section>
+
+  <section class="charts" style="margin-bottom:14px">
+    <div class="chart-top">
+      <div class="tabs" id="rtTabs"></div>
+      <div class="hint">앞뒤 6봉 중 고점/저점에 그때의 Fear를 표시 · 분봉·시간봉의 Fear는 추정치, 1일·1주는 공식 값과 신호</div>
+    </div>
+    <div class="pane-h"><span class="name"><i class="dot" style="background:var(--qqq)"></i>BTC 실시간 차트_1month MACD gold cross check</span><span class="val" id="hvR"></span><span class="when" id="hwR"></span></div>
+    <div class="wscroll" id="rscroll"><canvas id="cR"></canvas></div>
+  </section>
+
+  
+
+  <section class="charts">
+    <div class="chart-top">
+      <div class="tabs" id="tabs"></div>
+      <div class="legend"><span><i class="dot" style="background:#ea8c00"></i>Fear 공포·탐욕 지수 (오른쪽 눈금)</span><span><i class="dot" style="background:#c3c8d2"></i>BTC 가격 USD (왼쪽 눈금)</span></div>
+    </div>
+    <div class="pane-h"><span class="name">Fear 공포·탐욕 지수 + BTC (CoinMarketCap)</span><span class="val" id="hvVIX"></span><span class="when" id="hwVIX"></span></div>
+    <canvas id="cVIX"></canvas>
+  </section>
+
+  <section class="charts">
+    <div class="pane-h"><span class="name"><i class="dot" style="background:var(--qqq)"></i>BTC 주봉 5년 · 3개월 고점/저점 때의 Fear</span><span class="val" id="hvW"></span><span class="when" id="hwW"></span></div>
+    <div class="wnote">앞뒤 6주(약 3개월) 안에서 가장 높은 주는 위쪽, 가장 낮은 주는 아래쪽에 그 주의 Fear(최근 7일 평균)와 당시 신호를 표시합니다 · CoinMarketCap 지수는 2023년 6월부터라 그 이전에는 표시가 없습니다</div>
+    <div class="wscroll" id="wscroll"><canvas id="cW"></canvas></div>
+  </section>
+
+  <footer id="foot"></footer>
+</div>
+</div>
+
+<script>
+/* ===== 설정 (기준값은 여기서 조정) ===== */
+const CFG = {
+  refreshSec: 60,
+  rtSec: 20,    // 실시간 차트(1·5·15분봉) 갱신 주기(초)
+  k: 1.5,       // 추정 Fear: BTC 가 1% 움직일 때 지수가 움직이는 포인트 (과거 일별 데이터에 맞춘 값)
+  bars: 120,    // 실시간 차트에 보여줄 봉 개수
+  weeks: 260,   // 주봉 차트 기간 (5년)
+  pivot: 6      // 고점·저점 판정: 앞뒤 6봉 중 최고·최저
+};
+// 카드 5개. n: 지수를 평균 내는 기간(일). buy 이하면 BUY(공포), sell 이상이면 SELL(탐욕) — 0~100 눈금을 BUY 4 : HOLD 2 : SELL 4 로 나눔
+// span: 봉은 시작 시각으로 오므로, 그 봉이 끝나는 시점(현재 봉은 지금)까지의 지수를 쓰기 위한 보정(초)
+const TFS = [
+  { id: '1h',  label: '1시간', src: 'h', n: 1,  buy: 40, sell: 60, span: 3599, daily: 1, key: t => Math.floor(t / 3600) },
+  { id: '4h',  label: '4시간', src: 'h', n: 1,  buy: 40, sell: 60, span: 14399, daily: 1, key: t => Math.floor(t / 14400) },
+  { id: '1d',  label: '1일',   src: 'd', n: 1,  buy: 40, sell: 60, span: 86399, key: t => Math.floor(t / 86400) },
+  { id: '1w',  label: '1주',   src: 'w', n: 7,  buy: 40, sell: 60, span: 6 * 86400, key: t => Math.floor((t / 86400 + 3) / 7) },
+  { id: '1mo', label: '1달',   src: 'm', n: 30, buy: 40, sell: 60, span: 30 * 86400, key: t => { const d = new Date(t * 1000); return d.getUTCFullYear() * 12 + d.getUTCMonth(); } }
+];
+// 실시간 차트의 봉. 1·5·15분봉(rt)은 fag_getLive 로 따로 받아옴. est: Fear 를 추정치로 계산(분봉·시간봉). sig: 라벨에 BUY/HOLD/SELL 도 붙임(1일·1주)
+const RT = [
+  { id: '1m',  tab: '1분봉',  rt: 1, est: 1, n: 1, buy: 40, sell: 60, span: 59,  key: t => Math.floor(t / 60) },
+  { id: '5m',  tab: '5분봉',  rt: 1, est: 1, n: 1, buy: 40, sell: 60, span: 299, key: t => Math.floor(t / 300) },
+  { id: '15m', tab: '15분봉', rt: 1, est: 1, n: 1, buy: 40, sell: 60, span: 899, key: t => Math.floor(t / 900) },
+  Object.assign({ tab: '1시간봉', est: 1 }, TFS[0]), Object.assign({ tab: '4시간봉', est: 1 }, TFS[1]),
+  Object.assign({ tab: '1일', sig: 1 }, TFS[2]), Object.assign({ tab: '1주', sig: 1 }, TFS[3])
+];
+// 지수 + BTC 차트의 기간 (일). 0 = 전체
+const PERIODS = [{ id: '1mo', tab: '1달', n: 30 }, { id: '3mo', tab: '3달', n: 90 }, { id: '1y', tab: '1년', n: 365 }, { id: 'all', tab: '전체', n: 0 }];
+let rtTf = '1d', period = 'all';
+// F = [[t, 지수, BTC종가], ...] (일별), PS = 지수 누적합, B[src]·RT[id] = BTC 봉 [[t, 시가, 고가, 저가, 종가], ...]
+// A = 추정 Fear 의 기준점 [[t, 공식 지수, 그때 BTC 가격], ...] (일별 값 + 5분마다 기록한 현재값)
+const raw = { F: [], PS: [0], B: {}, RT: {}, A: [] };
+let live = null, failed = false, at = '';
+const hov = { cR: null, cW: null, cVIX: null, cQ: null }, scrolled = {};
+// 실시간 차트 보기 상태: cnt = 화면에 보이는 봉 수, off = 오른쪽 끝에서 얼마나 과거로 이동했는지(봉 수)
+const view = { cR: { cnt: CFG.bars, off: 0 }, cQ: { cnt: CFG.bars, off: 0 } };
+const $ = id => document.getElementById(id);
+function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+/* ===== 계산 ===== */
+function aggregate(pts, key) {
+  const out = [];
+  for (const [t, o, h, l, c] of pts) {
+    const k = key(t), a = out[out.length - 1];
+    if (a && a.k === k) { a.h = Math.max(a.h, h); a.l = Math.min(a.l, l); a.c = c; } else out.push({ k, t, o, h, l, c });
+  }
+  return out;
+}
+// 365일 이동평균: 일봉 종가 365개의 평균 → [[그날 0시(UTC), 평균], ...]. 마지막(오늘) 종가는 현재가로 계산
+function dailyMA() {
+  const d = raw.B.d || [], c = d.map(z => z[4]), out = [];
+  if (live != null && c.length) c[c.length - 1] = live;
+  let sum = 0;
+  for (let i = 0; i < c.length; i++) {
+    sum += c[i]; if (i >= 365) sum -= c[i - 365];
+    if (i >= 364) out.push([d[i][0], sum / 365]);
+  }
+  return out;
+}
+// BTC 봉마다 그 시점의 Fear(최근 n일 평균)를 붙임
+function series(tf) {
+  const b = aggregate((tf.rt ? raw.RT[tf.id] : raw.B[tf.src]) || [], tf.key), F = raw.F, PS = raw.PS, now = Date.now() / 1000;
+  const S = { t: [], idx: [], o: [], h: [], l: [], c: [], ma: [] };
+  const D = dailyMA();
+  let j = -1, q = -1;
+  for (const p of b) {
+    const end = Math.min(now, p.t + tf.span);
+    while (j + 1 < F.length && F[j + 1][0] <= end) j++;
+    while (q + 1 < D.length && D[q + 1][0] <= end) q++;
+    S.ma.push(q >= 0 ? D[q][1] : null);
+    S.t.push(p.t); S.o.push(p.o); S.h.push(p.h); S.l.push(p.l); S.c.push(p.c);
+    S.idx.push(tf.est ? estAt(end, p.c) : j >= tf.n - 1 ? (PS[j + 1] - PS[j + 1 - tf.n]) / tf.n : null);
+  }
+  const L = S.t.length - 1;   // 마지막 봉은 현재가로
+  if (L >= 0 && live != null) { S.c[L] = live; S.h[L] = Math.max(S.h[L], live); S.l[L] = Math.min(S.l[L], live); if (tf.est) S.idx[L] = estAt(now, live); }
+  return S;
+}
+// 추정 Fear (분봉·시간봉용): CMC 공식 값을 기준점으로 두고, 기준점 사이는 BTC 가격 변화로 채움.
+// 기준점 a, b 사이의 시각 t 에서는 "a 기준 추정"과 "b 기준 추정"을 시간 비율로 섞어, 기준점에서는 공식 값과 정확히 일치.
+function estAt(t, price) {
+  const A = raw.A;
+  if (!A.length || price == null || t <= A[0][0]) return null;
+  let lo = 0, hi = A.length - 1;
+  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (A[m][0] <= t) lo = m; else hi = m - 1; }
+  const a = A[lo], b = A[lo + 1], f = z => z[1] + CFG.k * 100 * Math.log(price / z[2]);
+  let v = f(a);
+  if (b) { const w = (t - a[0]) / (b[0] - a[0]); v = (1 - w) * v + w * f(b); }
+  return Math.max(0, Math.min(100, v));
+}
+function signalOf(v, tf) {
+  if (v == null) return { s: 'HOLD', why: '데이터 부족' };
+  if (v <= tf.buy) return { s: 'BUY', why: '공포 구간 · 지수 낮음' };
+  if (v >= tf.sell) return { s: 'SELL', why: '탐욕 구간 · 지수 높음' };
+  return { s: 'HOLD', why: '중립 구간' };
+}
+// CoinMarketCap 과 같은 5단계 구간과 색
+function zone(v) {
+  return v < 20 ? { name: '극단적 공포', color: '#ea3943' } : v < 40 ? { name: '공포', color: '#ea8c00' }
+    : v < 60 ? { name: '중립', color: '#f3d42f' } : v < 80 ? { name: '탐욕', color: '#93d900' } : { name: '극단적 탐욕', color: '#16c784' };
+}
+const fmtIdx = (v, tf) => v == null ? '–' : v.toFixed(tf.n > 1 ? 1 : 0);
+const fmt = (n, d = 2) => n == null ? '–' : n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+function fmtTime(t, tfId) {
+  const o = tfId === '1mo' ? { year: 'numeric', month: '2-digit' }
+    : (tfId === '1d' || tfId === '1w') ? { year: '2-digit', month: '2-digit', day: '2-digit' }
+    : (tfId === '1m' || tfId === '5m' || tfId === '15m') ? { day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }
+    : { month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false };
+  return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', ...o }).format(new Date(t * 1000));
+}
+
+/* ===== 데이터: Apps Script(fag.gs) → CoinMarketCap 공포·탐욕 지수 + 야후 파이낸스 BTC ===== */
+function load() {
+  google.script.run
+    .withSuccessHandler(d => {
+      if (!d || !d.F || !d.F.length || !d.B || !d.B.d || !d.B.d.length) { failed = true; renderStatus(); return; }
+      raw.F = d.F; raw.B = d.B; live = d.live || null;
+      { const M = d.M, e1 = document.getElementById('pxMVRV'), e2 = document.getElementById('chgMVRV'); if (M && e1 && !isNaN(M.m)) { e1.textContent = Number(M.m).toFixed(2); if (e2) e2.textContent = 'MVRV-Z ' + Number(M.z).toFixed(2) + ' · Z-Score ' + Number(M.s).toFixed(2); } }
+      raw.PS = [0]; for (const x of d.F) raw.PS.push(raw.PS[raw.PS.length - 1] + x[1]);
+      // 기준점: 어제까지의 일별 값 + 기록된 장중 공식 값(현재값 포함)
+      const A = d.F.slice(0, -1).concat(d.I || []).filter(z => z[2] != null).sort((x, y) => x[0] - y[0]);
+      raw.A = A.filter((z, i) => i === 0 || z[0] > A[i - 1][0]);
+      at = d.at; failed = false; renderAll();
+    })
+    .withFailureHandler(() => { failed = true; renderStatus(); })
+    .fag_getData();
+}
+// 실시간 차트의 1·5·15분봉만 따로, 더 자주 받아옴
+function loadRT() {
+  const tf = RT.find(x => x.id === rtTf);
+  if (!tf.rt) return;
+  google.script.run
+    .withSuccessHandler(d => {
+      if (!d || !d.p || !d.p.length) return;
+      raw.RT[d.tf] = d.p; if (d.live) live = d.live;
+      if (raw.F.length) renderRT();
+    })
+    .fag_getLive(tf.id);
+}
+
+/* ===== 화면: 상단 시세 + 카드 ===== */
+function renderQuotes() {
+  const F = raw.F, n = F.length;
+  if (n) {
+    $('pxVIX').textContent = String(F[n - 1][1]);
+    if (n > 1) {
+      const d = F[n - 1][1] - F[n - 2][1], el = $('chgVIX');
+      el.textContent = (d >= 0 ? '▲ +' : '▼ ') + d + ' (전일 대비)';
+      el.className = 'chg ' + (d >= 0 ? 'up' : 'down');
+    }
+  }
+  const s = series(TFS[2]), m = s.c.length, last = s.c[m - 1], prev = s.c[m - 2];
+  $('pxQQQ').textContent = fmt(last, 0);
+  if (last != null && prev != null) {
+    const p = (last / prev - 1) * 100, el = $('chgQQQ');
+    el.textContent = (p >= 0 ? '▲ +' : '▼ ') + fmt(p) + '%';
+    el.className = 'chg ' + (p >= 0 ? 'up' : 'down');
+  }
+}
+function renderSignals() {
+  const icon = { BUY: '▲', HOLD: '■', SELL: '▼' };
+  $('signals').innerHTML = TFS.map(tf => {
+    const ix = series(tf).idx, v = ix[ix.length - 1], p = ix[ix.length - 2], g = signalOf(v, tf);
+    // 이전 봉 대비 지수 방향 (1일 카드면 이전 1일, 1주 카드면 이전 1주)
+    const d = (tf.daily || v == null || p == null) ? 0 : v - p, dir = d > 0.05 ? 'r' : d < -0.05 ? 'l' : '';
+    const pos = v == null ? 50 : Math.max(1, Math.min(99, v));
+    const note = tf.daily ? ' · 시간 단위 과거 값 없음(1일과 동일)' : tf.n > 1 ? ' · 최근 ' + tf.n + '일 평균' : '';
+    return `<div class="card" title="${g.why}${note}">
+      <div class="tf">${tf.label}<span>Fear ${fmtIdx(v, tf)}</span></div>
+      <div class="sig ${g.s}"><small>${icon[g.s]}</small>${g.s}</div>
+      <div class="meter"><i class="zb" style="width:${tf.buy}%">BUY</i><i class="zs" style="left:${tf.sell}%;width:${100 - tf.sell}%">SELL</i><b style="left:${pos}%"></b>${dir ? `<em class="${dir}" style="left:${pos}%">${dir === 'r' ? '▶' : '◀'}</em>` : ''}</div>
+      <div class="why">${g.why}${note}${dir ? ` · 이전 ${tf.label} 대비 ${d > 0 ? '▲' : '▼'}${Math.abs(d).toFixed(1)}` : ''}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ===== 캔들 차트 (실시간 차트 · 주봉 5년 차트 공용) ===== */
+function prep(cv) {
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (cv.width !== W * dpr || cv.height !== H * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+  const x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
+  return { x, W, H };
+}
+// 십자선 가격표: 어두운 박스에 흰 글씨 (x 가운데 정렬, y 는 박스 세로 중심)
+function xLabel(x, text, bx, by, bw) {
+  x.font = '600 11px system-ui, sans-serif'; x.fillStyle = '#2a2e39';
+  x.beginPath(); x.roundRect(bx, by - 9, bw, 18, 4); x.fill();
+  x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, bx + bw / 2, by + .5);
+}
+function drawCandles(cv, S, tfId, hv) {
+  const { x, W, H } = prep(cv), n = S.t.length;
+  if (n < 2) return null;
+  const padR = 58, padB = 20, padT = 12, pw = W - padR, ph = H - padT - padB;
+  let lo = Math.min(...S.l), hi = Math.max(...S.h); const m = (hi - lo) * 0.42 || 1; lo -= m; hi += m;
+  const X = i => (i + .5) / n * (pw - 6) + 3, Y = v => padT + (hi - v) / (hi - lo) * ph;
+  const line = css('--line'), ink3 = css('--ink3'), up = css('--buy'), dn = css('--sell');
+  const lv = S.c[n - 1], ly = Y(lv);
+  // 가로 눈금
+  x.font = '11px system-ui, sans-serif'; x.textBaseline = 'middle'; x.textAlign = 'left';
+  x.strokeStyle = line; x.lineWidth = 1; x.fillStyle = ink3;
+  for (let i = 0; i <= 4; i++) {
+    const v = lo + (hi - lo) * i / 4, y = Math.round(Y(v)) + .5;
+    x.beginPath(); x.moveTo(0, y); x.lineTo(pw, y); x.stroke();
+    if (Math.abs(y - ly) > 14 && !(cv._wm && i === 1)) x.fillText(fmt(v, cv._dec || 0), pw + 8, y);
+  }
+  // 시간 눈금
+  x.textAlign = 'center'; x.textBaseline = 'alphabetic';
+  const ticks = Math.max(2, Math.floor(pw / 150));
+  for (let i = 0; i < ticks; i++) {
+    const idx = Math.round((i + .5) / ticks * (n - 1));
+    x.fillText(fmtTime(S.t[idx], tfId), X(idx), H - 5);
+  }
+  // 캔들: 오른 봉 빨강, 내린 봉 파랑
+  const cw = Math.max(1, Math.min(14, (pw - 6) / n * 0.68));
+  for (let i = 0; i < n; i++) {
+    const col = S.c[i] >= S.o[i] ? up : dn, cx = X(i);
+    x.strokeStyle = col; x.lineWidth = 1;
+    x.beginPath(); x.moveTo(Math.round(cx) + .5, Y(S.h[i])); x.lineTo(Math.round(cx) + .5, Y(S.l[i])); x.stroke();
+    const y1 = Y(Math.max(S.o[i], S.c[i])), y2 = Y(Math.min(S.o[i], S.c[i]));
+    x.fillStyle = col; x.fillRect(cx - cw / 2, y1, cw, Math.max(1, y2 - y1));
+  }
+  // 365일 이동평균선 (주황)
+  if (S.ma && S.ma.some(z => z != null)) {
+    x.save(); x.beginPath(); x.rect(0, padT, pw, ph); x.clip();
+    x.strokeStyle = '#f5a623'; x.lineWidth = 2; x.lineJoin = 'round'; x.beginPath();
+    let st = false;
+    for (let i = 0; i < n; i++) { const m = S.ma[i]; if (m == null) { st = false; continue; } st ? x.lineTo(X(i), Y(m)) : x.moveTo(X(i), Y(m)); st = true; }
+    x.stroke(); x.restore();
+    const lm = S.ma[n - 1];
+    if (lm != null) {
+      const my = Y(lm);
+      // 가격 범위 밖이면 위/아래 가장자리에 ▲/▼ 와 함께 표시
+      const ty = Math.max(padT + 9, Math.min(padT + ph - 9, my)), ar = my < padT ? '▲' : my > padT + ph ? '▼' : '';
+      if (Math.abs(ty - ly) > 20) {
+        x.fillStyle = '#f5a623'; x.beginPath(); x.roundRect(pw + 3, ty - 9, padR - 5, 18, 4); x.fill();
+        x.fillStyle = '#fff'; x.textAlign = 'left'; x.textBaseline = 'middle'; x.font = '600 ' + (ar ? 10 : 11) + 'px system-ui, sans-serif';
+        x.fillText(ar + fmt(lm, 0), pw + (ar ? 5 : 8), ty + .5);
+      }
+    }
+  }
+  // 현재가 표시
+  const lc = lv >= S.o[n - 1] ? up : dn;
+  x.setLineDash([3, 3]); x.strokeStyle = lc; x.lineWidth = 1;
+  x.beginPath(); x.moveTo(0, ly); x.lineTo(pw, ly); x.stroke(); x.setLineDash([]);
+  x.fillStyle = lc; x.beginPath(); x.roundRect(pw + 3, ly - 9, padR - 5, 18, 4); x.fill();
+  x.fillStyle = '#fff'; x.textAlign = 'left'; x.textBaseline = 'middle'; x.font = '600 11px system-ui, sans-serif';
+  x.fillText(fmt(lv, cv._dec || 0), pw + 8, ly + .5);
+  // 십자선
+  // 십자선(+): 점선 세로·가로선, 오른쪽 눈금에 가로선 높이의 가격
+  if (hv != null && hv < n) {
+    const hx = Math.round(X(hv)) + .5;
+    x.strokeStyle = ink3; x.lineWidth = 1; x.setLineDash([4, 3]);
+    x.beginPath(); x.moveTo(hx, padT); x.lineTo(hx, padT + ph); x.stroke();
+    const hy = cv._hy;
+    if (hy != null && hy >= padT && hy <= padT + ph) {
+      x.beginPath(); x.moveTo(0, Math.round(hy) + .5); x.lineTo(pw, Math.round(hy) + .5); x.stroke();
+      x.setLineDash([]);
+      xLabel(x, fmt(hi - (hy - padT) / ph * (hi - lo), cv._dec || 0), pw + 3, hy, padR - 5);
+    }
+    x.setLineDash([]);
+  }
+  cv._X = { x0: 3, pw: pw - 6, n, band: 1 };
+  return { x, X, Y, pw, H };
+}
+/* ===== 시그널 매수 수익 (1일봉 기준 · 최근 1년) =====
+   BTC: 1일봉 저점 라벨이 BUY → 1BTC 매수, 고점 라벨이 SELL → 보유분 전량 매도 (미청산은 현재가 평가)
+   QQQM: VIX 저점 라벨 = 매수, 고점 라벨 = 매도 · 1회 1억원(1달러 = 1350원) 매수 가정 */
+const SIGP = { days: 1825, usd: 1e8 / 1350 };
+function sigFmt(v, unit) {
+  const a = Math.abs(v), s = v < 0 ? '-' : '+';
+  const t = a >= 999500 ? (a / 1e6).toFixed(2) + 'M' : a >= 1e4 ? (a / 1e3).toFixed(1) + 'K' : Math.round(a).toLocaleString('en-US');
+  return s + t + unit;
+}
+// (이전 방식, 현재 미사용) VIX 시그널 탭 공식: VIX 의 RSI(14) 가 기준 이상이면 BUY, 기준 이하이면 SELL (시간봉별 기준값, 분봉은 1시간 기준 사용)
+const VIXTH = { '1h': { sell: 37, buy: 61 }, '4h': { sell: 42, buy: 61 }, '1d': { sell: 44, buy: 56 }, '1w': { sell: 44, buy: 56 } };
+function vixThr(id) { return VIXTH[id] || VIXTH['1h']; }
+function vixRsi(idx) {   // 봉별 VIX → 봉별 RSI(14) (VIX 없는 봉은 건너뜀)
+  const out = new Array(idx.length).fill(null), N = 14;
+  let prev = null, k = 0, g = 0, l = 0, ag = 0, al = 0;
+  for (let i = 0; i < idx.length; i++) {
+    const x = idx[i]; if (x == null) continue;
+    if (prev == null) { prev = x; continue; }
+    const d = x - prev; prev = x; k++;
+    if (k <= N) { g += Math.max(d, 0); l += Math.max(-d, 0); if (k < N) continue; ag = g / N; al = l / N; }
+    else { ag = (ag * (N - 1) + Math.max(d, 0)) / N; al = (al * (N - 1) + Math.max(-d, 0)) / N; }
+    out[i] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+  }
+  return out;
+}
+// ===== 최종 전략(VIX 위기 필터) 신호 — 일봉 기준, 신호 봉 종가 (Simulation 탭과 같은 규칙) =====
+// SELL(방어로): VIX/VIX20일평균 >= 1.15 & VIX >= 22 & QQQM < 200일선 / BUY(복귀): VIX <= 16 또는 비율 <= 0.9
+// ADD(추가 투입): 보유 중 VIX 급등(비율 >= 1.15, VIX >= 22)인데 200일선 위(눌림) → 신호 1번에 1회 · 전환·ADD 간 최소 20거래일
+const QSIG = { ra: 1.15, vL: 22, rb: 0.9, vLr: 16, H: 20, xmul: 2 };
+function qEvents() {
+  const D = rawQ['1d']; if (!D || D.length < 215) return null;
+  const n = D.length, c = D.map(r => r[4]), vf = [];
+  if (liveQ != null) c[n - 1] = liveQ;
+  let lv = null; D.forEach(r => { if (r[5] != null) lv = r[5]; vf.push(lv); });
+  const sma = (a, L, i) => { if (i < L - 1) return null; let t = 0; for (let j = i - L + 1; j <= i; j++) { if (a[j] == null) return null; t += a[j]; } return t / L; };
+  const ev = []; let inQ = false, last = -1e9, lastX = -1e9, used = false;
+  for (let i = 0; i < n; i++) {
+    const M = sma(vf, 20, i), S2 = sma(c, 200, i); if (M == null || S2 == null) continue;
+    const ratio = vf[i] / M, above = c[i] >= S2;
+    if (inQ) {
+      if (ratio >= QSIG.ra && vf[i] >= QSIG.vL && !above && i - last >= QSIG.H) { inQ = false; last = i; used = false; ev.push({ i: i, s: 'SELL' }); }
+      else if (!used && ratio >= QSIG.ra && vf[i] >= QSIG.vL && above && i - lastX >= QSIG.H) { used = true; lastX = i; ev.push({ i: i, s: 'ADD' }); }
+    } else if ((vf[i] <= QSIG.vLr || ratio <= QSIG.rb) && i - last >= QSIG.H) { inQ = true; last = i; used = false; ev.push({ i: i, s: 'BUY' }); }
+  }
+  return { ev: ev, t: D.map(r => r[0]), inQ: inQ };
+}
+function sigTradesQ(A) {
+  return { buy: {}, sell: {}, add: {}, ret: null, n: 0, pf: 0 };   // BUY/SELL 신호 삭제 — 새 전략을 구성할 때까지 표시하지 않음 (아래는 이전 방식, 미사용)   // 일봉 신호를 이 시간봉의 봉에 맞춰 표시 (신호가 난 날을 포함하는 마지막 봉)
+  const n = A.t.length, buy = {}, sell = {}, add = {}, open = [], Qv = qEvents();
+  const lim = Date.now() / 1000 - SIGP.days * 86400, byBar = {};
+  if (Qv) Qv.ev.forEach(e => {
+    const td = Qv.t[e.i] + 7 * 3600; let j = -1;
+    for (let k = n - 1; k >= 0; k--) if (A.t[k] <= td) { j = k; break; }
+    if (j < 0 || A.t[j] < lim) return;
+    byBar[j] = e.s;   // 같은 봉(주봉 등)에 여러 신호면 마지막 것만
+  });
+  Object.keys(byBar).map(Number).sort((a, b) => a - b).forEach(j => {
+    const s = byBar[j];
+    if (s === 'BUY') { buy[j] = { p: null, x: null, w: 1 }; open.push(buy[j]); }
+    else if (s === 'ADD') { add[j] = { p: null, x: null, w: QSIG.xmul }; open.push(add[j]); }
+    else { sell[j] = 1; open.forEach(b => { b.x = j; }); open.length = 0; }
+  });
+  let profit = 0, cost = 0, cnt = 0;
+  [[buy, 1], [add, 1]].forEach(pr => { for (const k in pr[0]) {
+    const b = pr[0][k], i = +k, ex = A.c[b.x != null ? b.x : n - 1], en = A.c[i];
+    if (!(en > 0) || ex == null) continue;
+    const inv = SIGP.usd * b.w; b.p = inv * (ex / en - 1); profit += b.p; cost += inv; cnt++;
+  } });
+  return { buy: buy, sell: sell, add: add, ret: cost > 0 ? profit / cost * 100 : null, n: cnt, pf: profit };
+}
+function sigTradesTri(A, tf) {
+  const buy = {}, sell = {}, R = TRIQ && TRIQ.m;
+  if (R && A && A.t && A.t.length) {
+    const n = A.t.length, span = (tf && tf.id === '1w' ? 8 : 2) * 86400;
+    R.forEach(function (e) {
+      const td = e[0] + 23 * 3600; let lo = 0, hi = n - 1, j = -1;
+      while (lo <= hi) { const mid = (lo + hi) >> 1; if (A.t[mid] <= td) { j = mid; lo = mid + 1; } else hi = mid - 1; }
+      if (j < 0 || td - A.t[j] > span) return;
+      buy[j] = { p: null, x: null, w: 1, lab: e[1] };
+    });
+  }
+  return { buy: buy, sell: sell, add: {}, ret: null, n: 0, pf: 0 };
+}
+var TRIQ = null;
+function loadTri() { google.script.run.withSuccessHandler(function (d) { if (d && d.m) { TRIQ = d; renderQ(); } }).sim_marks(); }
+function sigTrades(A, isQ, tf) {
+  if (isQ) return sigTradesTri(A, tf);
+  return { buy: {}, sell: {}, add: {}, ret: null, n: 0, pf: 0 };   // 모든 BUY/SELL 표시 삭제 (이전 방식은 아래에 남겨둠, 미사용)
+  if (isQ) return sigTradesQ(A);
+  const n = A.t.length, W = CFG.pivot, buy = {}, sell = {}, open = [];
+  const lim = Date.now() / 1000 - SIGP.days * 86400;
+  const R = isQ ? vixRsi(A.idx) : null, TH = isQ ? vixThr(tf.id) : null;
+  for (let i = 0; i < n; i++) {
+    const v = A.idx[i]; if (v == null) continue;
+    if (A.t[i] < lim) continue;   // 1년 전부터 빈 상태로 새로 시작 (그 전 보유분은 무시)
+    if (isQ) {   // QQQM: VIX RSI 기준 (보유 중이면 추가 BUY 없음, BUY 뒤 첫 SELL 1쌍)
+      const r = R[i]; if (r == null) continue;
+      if (!open.length && r >= TH.buy) { buy[i] = { p: null, x: null }; open.push(i); }
+      else if (open.length && r <= TH.sell) { sell[i] = 1; open.forEach(k => { buy[k].x = i; }); open.length = 0; }
+      continue;
+    }
+    // 과거 6봉만 보고 판단 (미래 봉 안 봄) → 한 번 뜬 BUY/SELL 은 나중에도 사라지지 않음
+    let top = true, bot = true;
+    for (let j = Math.max(0, i - W); j < i; j++) {
+      if (A.h[j] > A.h[i]) top = false;
+      if (A.l[j] < A.l[i]) bot = false;
+    }
+    if (!open.length && bot && (isQ || v <= 20)) { buy[i] = { p: null, x: null }; open.push(i); }   // 6봉 저가 갱신 = BUY (보유 중이면 추가 매수 없음)
+    else if (open.length && top && (isQ || v >= 70)) { sell[i] = 1; open.forEach(k => { buy[k].x = i; }); open.length = 0; }   // 6봉 고가 갱신 = SELL
+  }
+  let profit = 0, cost = 0, cnt = 0;
+  for (const k in buy) {
+    const b = buy[k], i = +k;
+    if (!(A.t[i] >= lim)) continue;
+    const ex = A.c[b.x != null ? b.x : n - 1], en = A.c[i];
+    if (!(en > 0) || ex == null) continue;
+    const inv = isQ ? SIGP.usd : en;
+    b.p = isQ ? inv * (ex / en - 1) : ex - en;
+    profit += b.p; cost += inv; cnt++;
+  }
+  return { buy: buy, sell: sell, ret: (isQ ? (cnt > 0) : cost > 0) ? profit / (isQ ? SIGP.usd : cost) * 100 : null, n: cnt, pf: profit };
+}
+// 캔들 + 고점/저점 때의 Fear 라벨. showSig 이면 라벨에 BUY/HOLD/SELL 음영도 붙임
+function pivotChart(id, tf, count, showSig, hvId, hwId, scId, o) {
+  const A = o ? o.A : series(tf), N = A.t.length, V = view[id];
+  const cnt = V ? Math.max(Math.min(20, N), Math.min(N, V.cnt)) : count;
+  const off = V ? Math.max(0, Math.min(N - cnt, V.off)) : 0;
+  const from = Math.max(0, N - cnt - off), S = {};
+  for (const k in A) S[k] = A[k].slice(from, N - off);
+  if (V) { V.off = off; $(id)._N = N; $(id)._cnt = Math.min(cnt, N); } else delete S.ma;
+  const n = S.t.length, v = S.idx;
+  if (hov[id] != null && hov[id] >= n) hov[id] = null;
+  $(id)._dec = o ? o.dec : 0; $(id)._wm = (tf.id === '1d');
+  const g = drawCandles($(id), S, tf.id, hov[id]);
+  const hi = hov[id] != null ? hov[id] : n - 1;
+  if (n) {
+    $(hvId).textContent = (o ? o.name : 'BTC') + ' ' + fmt(S.c[hi], o ? o.dec : 0) + (showSig ? ' · Fear ' + fmtIdx(v[hi], tf) + ' · ' + signalOf(v[hi], tf).s : v[hi] != null ? ' · ' + (o ? o.lab : 'Fear') + ' ' + v[hi].toFixed(o ? 2 : 1) + (o ? '' : ' (추정)') : '');
+    if (S.ma && S.ma[hi] != null) $(hvId).textContent += ' · 365일선 ' + fmt(S.ma[hi], 0);
+    $(hwId).textContent = hov[id] != null ? fmtTime(S.t[hi], tf.id) : (off ? fmtTime(S.t[hi], tf.id) : '현재');
+  } else { $(hvId).textContent = '불러오는 중…'; $(hwId).textContent = ''; }
+  if (!g) return;
+  const x = g.x, W = CFG.pivot, col = { BUY: css('--buy'), SELL: css('--sell'), HOLD: css('--hold'), ADD: '#16a34a' };
+  const ink = css('--ink'), ink3 = css('--ink3'), panel = css('--panel'), line = css('--line');
+  const T0 = (tf.id === '1d') ? sigTrades(A, !!o, tf) : null;
+  if (T0 && T0.ret != null) {   // 1년 수익률 워터마크 (우측 하단, 라벨 뒤에 깔림)
+    x.save(); x.textAlign = 'center'; x.textBaseline = 'alphabetic'; x.font = '700 11px system-ui, sans-serif';
+    x.globalAlpha = .7; x.fillStyle = T0.ret >= 0 ? col.BUY : col.SELL;   // 오른쪽 가격 눈금 칸 아래 (라벨과 안 겹침)
+    x.fillText('5년 ' + T0.n + '회', g.pw + 29, g.H - 62);
+    x.fillText(sigFmt(T0.pf, 'usd'), g.pw + 29, g.H - 48);
+    x.fillText((T0.ret >= 0 ? '+' : '') + T0.ret.toFixed(1) + '%', g.pw + 29, g.H - 34);
+    x.restore();
+  }
+  const placed = [], bw = 74, bh0 = 20;
+  const T = (tf.id === '1d' || o) ? sigTrades(A, !!o, tf) : null;   // 1일봉: 시그널 동그라미 + 수익금액 + 1년 수익률
+  const hit = (a, b) => a.x < b.x + bw + 3 && b.x < a.x + bw + 3 && a.y < b.y + b.h + 3 && b.y < a.y + a.h + 3;
+  for (let i = 0; i < n; i++) {
+    if (v[i] == null && !(T && o)) continue;
+    let top, bot;
+    if (T) { top = !!T.sell[from + i]; bot = !!(T.buy[from + i] || (T.add && T.add[from + i])); }   // 1일봉: 시그널이 뜬 봉만 표시 (한 번 뜨면 유지)
+    else {
+      top = true; bot = true;
+      for (let j = Math.max(0, i - W); j <= Math.min(n - 1, i + W); j++) {
+        if (j === i) continue;
+        if (S.h[j] > S.h[i]) top = false;
+        if (S.l[j] < S.l[i]) bot = false;
+      }
+    }
+    if (top === bot) continue;
+    if (showSig && id === 'cR') { if (top ? !(v[i] >= 70) : !(v[i] <= 20)) continue; }   // BTC 실시간 차트: 저+BUY / 고+SELL 라벨만
+    const px = g.X(i), py = g.Y(top ? S.h[i] : S.l[i]);
+    const isAdd = !!(T && T.add && !top && T.add[from + i]);
+    const tb = (T && !top) ? (T.buy[from + i] || (T.add && T.add[from + i])) : null, pr = !!(tb && tb.p != null), bh = bh0 + (pr ? 14 : 0);
+    const bx = Math.max(1, Math.min(g.pw - bw - 1, px - bw / 2)); let box = null;
+    for (let k = 0; k < 10 && !box; k++) for (const sd of [top ? -1 : 1, top ? 1 : -1]) {
+      const yy = sd > 0 ? py + 12 + k * (bh + 3) : py - 12 - bh - k * (bh + 3);
+      if (yy < 2 || yy > g.H - 22 - bh) continue;
+      const cd = { x: bx, y: yy, h: bh };
+      if (!placed.some(p => hit(p, cd))) { box = cd; break; }
+    }
+    if (!box) box = { x: bx, y: Math.max(2, Math.min(g.H - 22 - bh, top ? py - 12 - bh : py + 12)), h: bh };
+    placed.push(box);
+    const RKS = { '현금': 0, 'QQQ': 1, 'QLD': 2, 'TQQQ': 3 }, lp = (tb && tb.lab) ? String(tb.lab).split(' → ') : null;
+    const ec = (lp && lp.length === 2 && RKS[lp[0]] != null && RKS[lp[1]] != null) ? (RKS[lp[1]] > RKS[lp[0]] ? col.BUY : col.SELL) : (top ? col.SELL : (isAdd ? col.ADD : col.BUY));
+    // 연결선 + 점
+    x.strokeStyle = ink3; x.lineWidth = 1; x.beginPath(); x.moveTo(px, py); x.lineTo(px, box.y < py ? box.y + bh : box.y); x.stroke();
+    x.fillStyle = ec; x.strokeStyle = panel; x.lineWidth = 2; x.beginPath(); x.arc(px, py, 3, 0, 7); x.fill(); x.stroke();
+    if (T && ((!top && (T.buy[from + i] || (T.add && T.add[from + i]))) || (top && T.sell[from + i]))) { x.strokeStyle = ec; x.lineWidth = 2; x.beginPath(); x.arc(px, py, 6.5, 0, 7); x.stroke(); }   // 시그널: 빨강(buy+저) / 파랑(sell+고) 동그라미
+    // 라벨: Fear 값 (+ 흐린 음영 신호)
+    x.fillStyle = panel; x.strokeStyle = (lp ? ec : line); x.lineWidth = 1;
+    x.beginPath(); x.roundRect(box.x + .5, box.y + .5, bw, bh, 5); x.fill(); x.stroke();
+    x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillStyle = ec; x.font = '700 11px system-ui, sans-serif';   // 고 = 파랑, 저 = 빨강
+    x.fillText((T && o) ? (top ? 'SELL' : ((tb && tb.lab) ? tb.lab : 'BUY')) : ((top ? '고 ' : '저 ') + (o ? o.lab : 'Fear') + ' ' + v[i].toFixed(showSig ? 0 : 1)), box.x + bw / 2, box.y + 10.5);
+    if (false) {
+      const sig = showSig ? signalOf(v[i], tf).s : (top ? 'SELL' : (isAdd ? 'ADD' : 'BUY'));
+      x.fillStyle = col[sig] + '26'; x.beginPath(); x.roundRect(box.x + 5, box.y + 18, bw - 10, 13, 3); x.fill();
+      x.fillStyle = col[sig] + 'b3'; x.font = '700 9px system-ui, sans-serif';
+      x.fillText(sig, box.x + bw / 2, box.y + 25);
+    }
+    if (pr) {   // 매수 가정 수익금액 (라벨 아래)
+      x.fillStyle = tb.p >= 0 ? col.BUY : col.SELL; x.font = '700 10px system-ui, sans-serif'; x.textAlign = 'center';
+      x.fillText(sigFmt(tb.p, 'usd'), box.x + bw / 2, box.y + bh0 + 8);
+    }
+  }
+  if (!scrolled[id]) { const sc = $(scId); sc.scrollLeft = sc.scrollWidth; scrolled[id] = true; }
+}
+function renderWeekly() { pivotChart('cW', TFS[3], CFG.weeks, true, 'hvW', 'hwW', 'wscroll'); }
+function renderRT() {
+  const tf = RT.find(x => x.id === rtTf);
+  $('rtTabs').innerHTML = RT.map(x => `<button class="${x.id === rtTf ? 'on' : ''}" data-rt="${x.id}">${x.tab}</button>`).join('');
+  pivotChart('cR', tf, CFG.bars, !!tf.sig, 'hvR', 'hwR', 'rscroll');
+}
+
+/* ===== Fear 지수 + BTC 가격 (CoinMarketCap 차트 모양) ===== */
+function niceStep(v) {
+  const p = Math.pow(10, Math.floor(Math.log10(v))), m = v / p;
+  return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
+}
+function renderCmc() {
+  $('tabs').innerHTML = PERIODS.map(p => `<button class="${p.id === period ? 'on' : ''}" data-p="${p.id}">${p.tab}</button>`).join('');
+  const F = raw.F, cv = $('cVIX'), { x, W, H } = prep(cv);
+  const cnt = PERIODS.find(p => p.id === period).n || F.length, from = Math.max(0, F.length - cnt);
+  const t = [], v = [], p = [];
+  for (let i = from; i < F.length; i++) { t.push(F[i][0]); v.push(F[i][1]); p.push(F[i][2]); }
+  const n = t.length; if (n < 2) return;
+  if (live != null) p[n - 1] = live;
+  if (hov.cVIX != null && hov.cVIX >= n) hov.cVIX = null;
+  const padL = 46, padR = 40, padT = 10, padB = 20, pw = W - padL - padR, ph = H - padT - padB;
+  const top = niceStep(Math.max(...p.filter(z => z != null)) / 5) * 5;
+  const X = i => padL + i / (n - 1) * pw, YF = z => padT + (100 - z) / 100 * ph, YP = z => padT + (top - z) / top * ph;
+  const ink3 = css('--ink3'), line = css('--line'), panel = css('--panel');
+  // 극단적 탐욕(80~100) · 극단적 공포(0~20) 구간 음영
+  x.fillStyle = 'rgba(22,199,132,.10)'; x.fillRect(padL, YF(100), pw, YF(80) - YF(100));
+  x.fillStyle = 'rgba(234,57,67,.10)'; x.fillRect(padL, YF(20), pw, YF(0) - YF(20));
+  // 눈금: 왼쪽 = BTC(USD), 오른쪽 = 지수(0~100)
+  x.font = '11px system-ui, sans-serif'; x.textBaseline = 'middle'; x.fillStyle = ink3; x.strokeStyle = line; x.lineWidth = 1;
+  x.setLineDash([2, 3]);
+  for (let k = 0; k <= 5; k++) {
+    const y = Math.round(YF(k * 20)) + .5, usd = top * k / 5;
+    x.beginPath(); x.moveTo(padL, y); x.lineTo(padL + pw, y); x.stroke();
+    x.textAlign = 'right'; x.fillText(usd >= 1000 ? (usd / 1000) + 'K' : String(usd), padL - 6, y);
+    if (k < 5 || true) { x.textAlign = 'left'; x.fillText(String(k * 20), padL + pw + 6, y); }
+  }
+  x.setLineDash([]);
+  x.textAlign = 'right';
+  for (const [name, at] of [['극단적 탐욕', 90], ['탐욕', 70], ['중립', 50], ['공포', 30], ['극단적 공포', 10]]) x.fillText(name, padL + pw - 6, YF(at));
+  // 시간 눈금
+  x.textAlign = 'center'; x.textBaseline = 'alphabetic';
+  const ticks = Math.max(2, Math.floor(pw / 150));
+  for (let i = 0; i < ticks; i++) {
+    const idx = Math.round((i + .5) / ticks * (n - 1));
+    x.fillText(fmtTime(t[idx], '1d'), X(idx), H - 5);
+  }
+  // BTC 가격: 연한 회색 선 (뒤)
+  x.strokeStyle = '#c3c8d2'; x.lineWidth = 1.5; x.lineJoin = 'round'; x.beginPath();
+  let started = false;
+  for (let i = 0; i < n; i++) { if (p[i] == null) continue; started ? x.lineTo(X(i), YP(p[i])) : x.moveTo(X(i), YP(p[i])); started = true; }
+  x.stroke();
+  // Fear 지수: 구간 색으로 칠한 선 (앞)
+  x.lineWidth = 2; x.lineCap = 'round';
+  for (let i = 1; i < n; i++) {
+    x.strokeStyle = zone((v[i - 1] + v[i]) / 2).color;
+    x.beginPath(); x.moveTo(X(i - 1), YF(v[i - 1])); x.lineTo(X(i), YF(v[i])); x.stroke();
+  }
+  x.lineCap = 'butt';
+  // 현재 지수 표시
+  const lz = zone(v[n - 1]), ly = YF(v[n - 1]);
+  x.fillStyle = lz.color; x.beginPath(); x.roundRect(padL + pw + 3, ly - 9, padR - 6, 18, 4); x.fill();
+  x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = '700 11px system-ui, sans-serif';
+  x.fillText(String(v[n - 1]), padL + pw + 3 + (padR - 6) / 2, ly + .5);
+  // 십자선
+  const hi = hov.cVIX != null ? hov.cVIX : n - 1;
+  if (hov.cVIX != null) {
+    const hx = Math.round(X(hi)) + .5;
+    x.strokeStyle = ink3; x.lineWidth = 1; x.setLineDash([4, 3]); x.beginPath(); x.moveTo(hx, padT); x.lineTo(hx, padT + ph); x.stroke();
+    const hy = cv._hy;
+    if (hy != null && hy >= padT && hy <= padT + ph) {
+      x.beginPath(); x.moveTo(padL, Math.round(hy) + .5); x.lineTo(padL + pw, Math.round(hy) + .5); x.stroke();
+      x.setLineDash([]);
+      const usd = top - (hy - padT) / ph * top, fr = 100 - (hy - padT) / ph * 100;
+      xLabel(x, usd >= 1000 ? (usd / 1000).toFixed(1) + 'K' : usd.toFixed(0), 1, hy, padL - 5);   // 왼쪽 = BTC 가격
+      xLabel(x, fr.toFixed(1), padL + pw + 3, hy, padR - 6);                                      // 오른쪽 = Fear 지수
+    }
+    x.setLineDash([]);
+    x.fillStyle = zone(v[hi]).color; x.strokeStyle = panel; x.lineWidth = 2; x.beginPath(); x.arc(X(hi), YF(v[hi]), 5, 0, 7); x.fill(); x.stroke();
+    if (p[hi] != null) { x.fillStyle = '#9aa1ad'; x.beginPath(); x.arc(X(hi), YP(p[hi]), 4, 0, 7); x.fill(); x.stroke(); }
+  }
+  $('hvVIX').textContent = 'Fear ' + v[hi] + ' (' + zone(v[hi]).name + ') · BTC ' + fmt(p[hi], 0);
+  $('hwVIX').textContent = hov.cVIX != null ? fmtTime(t[hi], '1d') : '현재';
+  cv._X = { x0: padL, pw, n, band: 0 };
+}
+
+function renderAll() {
+  renderQuotes(); renderSignals(); renderRT(); renderCmc(); renderWeekly();
+  renderStatus();
+  try { alCheck(); } catch (e) {}
+}
+function renderStatus() {
+  $('updated').textContent = at ? '불러온 시각 ' + at + ' · ' + CFG.refreshSec + '초마다 새로고침' : '';
+  const b = $('mode');
+  b.textContent = failed ? '불러오기 실패 · 재시도 중' : '● 실시간';
+  b.className = 'badge ' + (failed ? 'demo' : 'live');
+}
+
+/* ===== 매수/매도 Sound (BTC 실시간 차트의 저·고 Fear 조건) ===== */
+// 매수: 일봉 저 Fear ≤13, 4시간봉 저 Fear ≤12, 1시간봉 저 Fear ≤11 이 모두 맞으면 1회 (소리 = buy)
+// 매도: 주봉 고 Fear ≥60, 일봉 고 Fear ≥55, 4시간봉 고 Fear ≥50, 1시간봉 고 Fear ≥45 가 모두 맞으면 1회 (소리 = sell)
+// 각 봉의 '저 Fear'/'고 Fear' = BTC 실시간 차트에 표시되는 가장 최근 저점/고점 라벨의 Fear 값
+// 조건이 처음 맞는 순간 1회만 울리고, 조건이 한 번 풀렸다가 다시 맞을 때 또 울림
+const AL_RULES = {
+  buy:  { low: true,  name: '매수', mark: '▲', color: '#16a34a', rules: [{ id: '1d', nm: '일', v: 13 }, { id: '4h', nm: '4시간', v: 12 }, { id: '1h', nm: '1시간', v: 11 }] },
+  sell: { low: false, name: '매도', mark: '▼', color: '#dc2626', rules: [{ id: '1w', nm: '주', v: 60 }, { id: '1d', nm: '일', v: 55 }, { id: '4h', nm: '4시간', v: 50 }, { id: '1h', nm: '1시간', v: 45 }] }
+};
+const AL = { ctx: null, bus: null, buy: { on: false, hit: false, last: null, parts: null }, sell: { on: false, hit: false, last: null, parts: null } };
+function alGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function alSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+for (const k of ['buy', 'sell']) { AL[k].on = alGet('fgSound_' + k) === 'on'; AL[k].hit = alGet('fgHit_' + k) === '1'; }
+
+function alAudio() {
+  if (!AL.ctx) {
+    const C = window.AudioContext || window.webkitAudioContext;
+    if (!C) return false;
+    const ctx = AL.ctx = new C(), comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -16; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.2;
+    comp.connect(ctx.destination);
+    AL.bus = ctx.createGain(); AL.bus.gain.value = 1.4; AL.bus.connect(comp);
+  }
+  if (AL.ctx.state === 'suspended') AL.ctx.resume();
+  return true;
+}
+function alNote(freq, type, t0, dur, vol) {
+  const ctx = AL.ctx, o = ctx.createOscillator(), g = ctx.createGain(), lp = ctx.createBiquadFilter();
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  lp.type = 'lowpass'; lp.frequency.value = type === 'square' ? 3000 : 8000;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0011, vol), t0 + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(lp); lp.connect(g); g.connect(AL.bus);
+  o.start(t0); o.stop(t0 + dur + 0.03);
+}
+// 매수 = 코인 획득 "띵-딩!", 매도 = 하강 아르페지오 (Trading View 탭과 같은 소리)
+// 소리: 영어 여성 음성이 "buy" / "sell" 이라고 말함 (브라우저 내장 음성 합성 사용 · 여성 영어 음성을 우선 고름)
+function alVoice() {
+  const vs = (window.speechSynthesis && speechSynthesis.getVoices()) || [];
+  const en = vs.filter(function (v) { return /^en[-_]/i.test(v.lang); });
+  const fem = /female|zira|samantha|karen|victoria|susan|hazel|aria|jenny|moira|tessa|serena|fiona|allison|ava|google us english/i;
+  return en.find(function (v) { return fem.test(v.name); }) || en[0] || null;
+}
+function alSpeak(word) {
+  if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) return false;
+  const u = new SpeechSynthesisUtterance(word), v = alVoice();
+  if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'en-US';
+  u.rate = 0.95; u.pitch = 1.1; u.volume = 1;
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
+  return true;
+}
+function alPlay(buy, vol) {
+  if (alSpeak(buy ? 'buy' : 'sell')) return;
+  // 음성 합성을 못 쓰는 브라우저에서는 예전 효과음으로 대체
+  if (!alAudio()) return;
+  const t0 = AL.ctx.currentTime + 0.02;
+  if (buy) { alNote(987.77, 'square', t0, 0.12, vol * 0.5); alNote(1318.51, 'square', t0 + 0.08, 0.5, vol * 0.5); }
+  else [659.26, 523.25, 440, 349.23, 293.66].forEach(function (f, i) { alNote(f, 'triangle', t0 + i * 0.09, 0.5, vol); });
+}
+function alLabel(k, flash) {
+  const A = AL_RULES[k], s = AL[k], b = $(k === 'buy' ? 'sndBuyBtn' : 'sndSellBtn'), l = $(k === 'buy' ? 'sndBuyLast' : 'sndSellLast');
+  if (b) { b.textContent = (s.on ? '🔊 ' : '🔇 ') + A.name + ' Sound ' + (s.on ? 'ON' : 'OFF'); b.className = 'snd-btn' + (s.on ? ' on' : ''); }
+  if (!l) return;
+  const side = A.low ? '저' : '고', cmp = A.low ? '≤' : '≥';
+  const cond = A.rules.map(function (r) { return r.nm + ' ' + cmp + r.v; }).join(' · ');
+  const prog = s.parts ? A.rules.map(function (r, i) { const z = s.parts[i]; return r.nm + ' ' + (z.val == null ? '–' : z.val) + '/' + r.v + (z.ok ? '✓' : ''); }).join(' · ') : '';
+  l.title = A.name + ' 조건 (' + side + ' Fear): ' + cond;
+  if (!s.on) l.textContent = side + ' Fear ' + cond;
+  else if (!AL.ctx) l.textContent = '화면을 한 번 누르면 소리가 나요';
+  else if (s.last) {
+    l.innerHTML = '<b style="color:' + A.color + '">' + A.mark + ' ' + A.name + ' 신호</b> @' + (s.last.price == null ? '–' : Math.floor(s.last.price).toLocaleString('en-US')) + ' · ' + s.last.at;
+    if (flash) { l.classList.remove('flash'); void l.offsetWidth; l.classList.add('flash'); }
+  } else l.textContent = '조건 대기 · ' + prog;
+}
+function alToggle(k) {
+  const s = AL[k]; s.on = !s.on; alSet('fgSound_' + k, s.on ? 'on' : 'off');
+  if (s.on) { alAudio(); alPlay(k === 'buy', 0.3); }
+  alLabel(k);
+}
+// 실시간 차트(pivotChart)와 같은 방식으로 가장 최근 고점/저점 라벨의 Fear 값을 구함 (1일·1주는 라벨처럼 정수로 반올림)
+function alPivot(tf, low) {
+  const S = series(tf), n = S.t.length, v = S.idx, W = CFG.pivot;
+  for (let i = n - 1; i >= Math.max(0, n - 400); i--) {
+    if (v[i] == null) continue;
+    let top = true, bot = true;
+    for (let j = Math.max(0, i - W); j <= Math.min(n - 1, i + W); j++) {
+      if (j === i) continue;
+      if (S.h[j] > S.h[i]) top = false;
+      if (S.l[j] < S.l[i]) bot = false;
+    }
+    if (top === bot || top === low) continue;   // top = 고점 라벨, bot = 저점 라벨
+    return tf.sig ? Math.round(v[i]) : Math.round(v[i] * 10) / 10;
+  }
+  return null;
+}
+function alCheck() {
+  if (!raw.F.length || !raw.A.length || !(raw.B.h && raw.B.h.length) || !(raw.B.d && raw.B.d.length) || !(raw.B.w && raw.B.w.length)) return;
+  for (const k of ['buy', 'sell']) {
+    const A = AL_RULES[k], s = AL[k];
+    s.parts = A.rules.map(function (r) {
+      const val = alPivot(RT.find(function (x) { return x.id === r.id; }), A.low);
+      return { val: val, ok: val != null && (A.low ? val <= r.v : val >= r.v) };
+    });
+    const all = s.parts.every(function (z) { return z.ok; });
+    let fresh = false;
+    if (all && !s.hit) {
+      s.hit = true; alSet('fgHit_' + k, '1'); fresh = true;
+      s.last = { price: live, at: fmtTime(Date.now() / 1000, '1m') };
+      if (s.on && AL.ctx && AL.ctx.state === 'running') alPlay(k === 'buy', 0.45);
+    } else if (!all && s.hit) { s.hit = false; alSet('fgHit_' + k, '0'); }
+    alLabel(k, fresh);
+  }
+}
+// 예전에 켜 두었으면: 브라우저는 화면을 한 번 눌러야 소리를 허용하므로 첫 터치 때 다시 켬
+if (AL.buy.on || AL.sell.on) {
+  const wake = function () { alAudio(); alLabel('buy'); alLabel('sell'); window.removeEventListener('pointerdown', wake, true); };
+  window.addEventListener('pointerdown', wake, true);
+}
+
+/* ===== QQQM 실시간 차트 (BTC 실시간 차트와 같은 모양 · Fear 대신 VIX) ===== */
+// 서버(fag_getQ)가 QQQM 봉과 같은 시각의 VIX 종가를 함께 보냄: [[t, 시가, 고가, 저가, 종가, VIX], ...]
+const QT = [
+  { id: '1m',  tab: '1분봉',  src: '1m',  key: t => Math.floor(t / 60) },
+  { id: '5m',  tab: '5분봉',  src: '5m',  key: t => Math.floor(t / 300) },
+  { id: '15m', tab: '15분봉', src: '15m', key: t => Math.floor(t / 900) },
+  { id: '1h',  tab: '1시간봉', src: '1h',  key: t => Math.floor(t / 3600) },
+  { id: '4h',  tab: '4시간봉', src: '1h',  key: t => Math.floor(t / 14400) },
+  { id: '1d',  tab: '1일',    src: '1d',  key: t => Math.floor(t / 86400) },
+  { id: '1w',  tab: '1주',    src: '1w',  key: t => Math.floor((t / 86400 + 3) / 7) }
+];
+const rawQ = {};
+let qTf = '1d', liveQ = null, qTick = 0;
+function seriesQ(tf) {
+  const src = rawQ[tf.src] || [], out = [];
+  for (const [t, o, h, l, c, vx] of src) {
+    const k = tf.key(t), a = out[out.length - 1];
+    if (a && a.k === k) { a.h = Math.max(a.h, h); a.l = Math.min(a.l, l); a.c = c; if (vx != null) a.v = vx; } else out.push({ k, t, o, h, l, c, v: vx });
+  }
+  const S = { t: [], idx: [], o: [], h: [], l: [], c: [], ma: [] };
+  for (const p of out) { S.t.push(p.t); S.idx.push(p.v == null ? null : p.v); S.o.push(p.o); S.h.push(p.h); S.l.push(p.l); S.c.push(p.c); S.ma.push(null); }
+  const L = S.t.length - 1;
+  if (L >= 0 && liveQ != null) { S.c[L] = liveQ; S.h[L] = Math.max(S.h[L], liveQ); S.l[L] = Math.min(S.l[L], liveQ); }
+  return S;
+}
+function renderQ() {
+  const tf = QT.find(x => x.id === qTf);
+  $('qHint').textContent = 'Tripod 신호 · 라벨 = 시그널 (buy1단계·buy 확정·공포·과매도)' + (TRIQ && TRIQ.now ? ' · 현재 ' + TRIQ.now.name : '') + ' · QQQM 은 미국 장이 열린 시간에만 거래되어, 장이 닫혀 있으면 마지막 장의 데이터가 보입니다';
+  $('qTabs').innerHTML = QT.map(x => '<button class="' + (x.id === qTf ? 'on' : '') + '" data-q="' + x.id + '">' + x.tab + '</button>').join('') + '<button data-qz="in">＋ 확대</button><button data-qz="out">－ 축소</button><button data-qz="reset">처음</button>';
+  pivotChart('cQ', tf, CFG.bars, false, 'hvQ', 'hwQ', 'qscroll', { A: seriesQ(tf), name: 'QQQM', lab: 'VIX', dec: 2, tag: 1 });
+}
+function loadQ() {
+  const tf = QT.find(x => x.id === qTf);
+  google.script.run
+    .withSuccessHandler(d => {
+      if (!d || !d.p || !d.p.length) return;
+      rawQ[d.tf] = d.p; if (d.live) liveQ = d.live; if (window.txResize) setTimeout(txResize, 0);
+      renderQ();
+      if (!rawQ['1d']) google.script.run.withSuccessHandler(dd => { if (dd && dd.p && dd.p.length) { rawQ['1d'] = dd.p; if (dd.live && liveQ == null) liveQ = dd.live; renderQ(); if (window.txResize) txResize(); } }).fag_getQ('1d');
+    })
+    .fag_getQ(tf.src);
+}
+$('qTabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-q]'); if (!b) return;
+  qTf = b.dataset.q; hov.cQ = null; scrolled.cQ = false; view.cQ.cnt = CFG.bars; view.cQ.off = 0; renderQ(); loadQ();
+});
+
+/* ===== 이벤트 ===== */
+window.addEventListener('resize', () => { renderQ(); if (window.txResize) txResize(); });
+for (const [id, draw] of [['cR', () => renderRT()], ['cVIX', () => renderCmc()], ['cW', () => renderWeekly()], ['cQ', () => renderQ()]]) {
+  const cv = $(id);
+  cv.addEventListener('pointermove', e => {
+    if (!cv._X) return;
+    const r = cv.getBoundingClientRect(), { x0, pw, n, band } = cv._X, f = (e.clientX - r.left - x0) / pw;
+    hov[id] = Math.max(0, Math.min(n - 1, band ? Math.floor(f * n) : Math.round(f * (n - 1))));
+    cv._hy = e.clientY - r.top;
+    draw();
+  });
+  cv.addEventListener('pointerleave', () => { hov[id] = null; cv._hy = null; draw(); });
+}
+// 실시간 차트: 마우스 휠 = 확대·축소(커서 위치 기준), 드래그 = 좌우 이동, 더블클릭 = 처음 상태로
+function zoomable(cv, V, rerender) {
+  const cur = () => cv._cnt || V.cnt;
+  cv.addEventListener('wheel', e => {
+    if (!cv._X || !cv._N) return;
+    e.preventDefault();
+    const r = cv.getBoundingClientRect(), f = Math.max(0, Math.min(1, (e.clientX - r.left - cv._X.x0) / cv._X.pw));
+    const N = cv._N, c0 = cur(), anchor = (N - c0 - V.off) + f * c0;
+    let c1 = Math.round(c0 * (e.deltaY > 0 ? 1.2 : 1 / 1.2));
+    if (e.deltaY > 0 && c1 <= c0) c1 = c0 + 1;
+    if (e.deltaY < 0 && c1 >= c0) c1 = c0 - 1;
+    c1 = Math.max(Math.min(20, N), Math.min(N, c1));
+    V.cnt = c1; V.off = Math.max(0, Math.min(N - c1, Math.round(N - c1 - (anchor - f * c1))));
+    rerender();
+  }, { passive: false });
+  let drag = null;
+  cv.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    drag = { x: e.clientX, off: V.off }; cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener('pointermove', e => {
+    if (!drag || !cv._X) return;
+    const per = cv._X.pw / cur(), d = Math.round((e.clientX - drag.x) / per);
+    V.off = Math.max(0, Math.min((cv._N || 0) - cur(), drag.off + d)); rerender();
+  });
+  const endDrag = () => { drag = null; };
+  cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
+  cv.addEventListener('dblclick', () => { V.cnt = CFG.bars; V.off = 0; rerender(); });
+}
+zoomable($('cR'), view.cR, renderRT);
+zoomable($('cQ'), view.cQ, renderQ);
+$('qTabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-qz]'); if (!b) return;
+  const V = view.cQ, cv = $('cQ'), N = cv._N, k = b.dataset.qz;
+  if (k === 'reset') { V.cnt = CFG.bars; V.off = 0; renderQ(); return; }
+  if (!N) return;
+  const c0 = cv._cnt || V.cnt, f = .5, anchor = (N - c0 - V.off) + f * c0;
+  let c1 = Math.round(c0 * (k === 'out' ? 1.3 : 1 / 1.3));
+  if (k === 'out' && c1 <= c0) c1 = c0 + 1; if (k === 'in' && c1 >= c0) c1 = c0 - 1;
+  c1 = Math.max(Math.min(20, N), Math.min(N, c1));
+  V.cnt = c1; V.off = Math.max(0, Math.min(N - c1, Math.round(N - c1 - (anchor - f * c1))));
+  renderQ();
+});
+$('rtTabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-rt]'); if (!b) return;
+  rtTf = b.dataset.rt; hov.cR = null; scrolled.cR = false; view.cR.cnt = CFG.bars; view.cR.off = 0; renderRT(); loadRT();
+});
+$('tabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-p]'); if (!b) return;
+  period = b.dataset.p; hov.cVIX = null; renderCmc();
+});
+
+/* ===== 시작 ===== */
+$('foot').textContent = `신호 기준: 크립토 공포·탐욕 지수(CoinMarketCap Fear and Greed Index, 0~100)가 낮으면 공포 → BUY, 높으면 탐욕 → SELL, 그 사이는 HOLD (BUY/SELL 기준값: ${TFS.map(t => t.label + ' ' + t.buy + '/' + t.sell).join(', ')}). 1주·1달 카드는 최근 7일·30일 평균입니다. 지수의 과거 값은 하루 단위라 1시간·4시간 카드는 1일과 같은 값이고, 실시간 차트의 분봉·시간봉에 붙는 Fear 는 CoinMarketCap 공식 값이 아니라 추정치입니다: 공식 값(일별 값과 5분마다 기록한 현재값)을 기준점으로 두고 그 사이를 BTC 가격 변화(1%당 약 ${CFG.k}포인트)로 채웁니다. BUY/HOLD/SELL 은 1일·1주 차트에만 표시합니다. 캔들은 오른 봉이 빨강, 내린 봉이 파랑입니다. 투자 판단의 참고용이며 투자 권유가 아닙니다.`;
+alLabel('buy'); alLabel('sell');
+loadQ(); loadTri(); setInterval(loadTri, 1800000);
+// QQQM: 분봉은 30초마다, 나머지 봉은 2분마다 (화면이 가려져 있으면 쉼)
+setInterval(function () { qTick++; if (!document.hidden && (qTf === '1m' || qTf === '5m' || qTf === '15m' || qTick % 4 === 0)) loadQ(); }, 30000);
+</script>
+
+<script>
+var TXS = null, TXQ = {}, TXTF = {}, TXCD = {}, TXHF = 'ALL', TXBUSY = false, TXERR = '';
+var TXTFS = [['15m','15분'],['1h','1시간'],['1d','1일'],['1w','1주']];
+function txnf(v, d){ return Number(v).toLocaleString('en-US', { minimumFractionDigits:d||0, maximumFractionDigits:d||0 }); }
+function txfm(v){
+  var a = Math.abs(v), s = v < 0 ? '-' : '+';
+  if (a < 1000) return s + txnf(a, 2);
+  if (a < 10000) return s + txnf(a, 0);
+  if (a < 1e6) return s + (a/1e3).toFixed(1) + 'K';
+  if (a < 1e9) return s + (a/1e6).toFixed(2) + 'M';
+  return s + (a/1e9).toFixed(2) + 'B';
+}
+function txcls(v){ return v > 0 ? 'tx-up' : v < 0 ? 'tx-dn' : 'tx-mu'; }
+function txpct(v){ return (v >= 0 ? '+' : '') + v.toFixed(2) + '%'; }
+function txsym(id){ return TXS.syms.filter(function(s){ return s.id === id; })[0]; }
+function txpad(n){ return (n < 10 ? '0' : '') + n; }
+function txtstr(t){ var d = new Date(t); return txpad(d.getMonth()+1) + '-' + txpad(d.getDate()) + ' ' + txpad(d.getHours()) + ':' + txpad(d.getMinutes()); }
+function txupnl(s){ var p = TXS.pos[s.id], px = TXQ[s.id]; if (!p || !p.q || px == null) return null; return (px - p.a) * p.q; }
+
+function txBuild(){
+  var h = '';
+  TXS.syms.forEach(function(s){
+    if (!TXTF[s.id]) TXTF[s.id] = '1d';
+    h += '<div class="tx-card" id="tc_' + s.id + '"><div class="tx-hd"><span class="tx-nm">' + s.name + '</span><span class="tx-px" id="tpx_' + s.id + '">-</span><div class="tx-tfs">';
+    TXTFS.forEach(function(t){ h += '<button class="tx-tf" data-s="' + s.id + '" data-t="' + t[0] + '">' + t[1] + '</button>'; });
+    h += '</div></div><div style="display:flex;gap:6px;margin:2px 0 6px"><button class="tx-zbtn" data-z="in" data-s="' + s.id + '">＋ 확대</button><button class="tx-zbtn" data-z="out" data-s="' + s.id + '">－ 축소</button><button class="tx-zbtn" data-z="reset" data-s="' + s.id + '">처음</button></div><canvas id="tcv_' + s.id + '"></canvas>' +
+      '<div class="tx-ord"><label>가격 <input id="tp_' + s.id + '" type="number" step="any" inputmode="decimal" placeholder="현재가"></label>' +
+      '<label>수량 <input id="tq_' + s.id + '" type="number" step="any" inputmode="decimal" placeholder="0"></label>' +
+      '<button class="tx-btn b" data-o="buy" data-s="' + s.id + '">매수</button>' +
+      '<button class="tx-btn s" data-o="sell" data-s="' + s.id + '">매도</button>' +
+      '<div class="tx-pl" id="tpl_' + s.id + '"></div></div>' +
+      '<div class="tx-prev" id="tpv_' + s.id + '"></div>' +
+      '<div class="tx-memo" id="tm_' + s.id + '"></div></div>';
+  });
+  $('txcards').innerHTML = h;
+  $('txcards').onclick = function(e){
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.t){ TXTF[b.dataset.s] = b.dataset.t; txLoadCandles(b.dataset.s); txRender(); return; }
+    if (b.dataset.o) txOrder(b.dataset.s, b.dataset.o);
+  };
+  $('txcards').oninput = function(e){ var m = (e.target.id || '').match(/^t[pq]_(.+)$/); if (m){ var s = txsym(m[1]); if (s) txPrev(s); } };
+  TXS.syms.forEach(function(s){
+    var cv = $('tcv_' + s.id);
+    cv.onmousemove = function(e){ var r = cv.getBoundingClientRect(); cv._mx = e.clientX - r.left; cv._my = e.clientY - r.top; txDraw(s.id); };
+    cv.onmouseleave = function(){ cv._mx = null; txDraw(s.id); };
+    cv.addEventListener('wheel', function(e){ e.preventDefault(); var r = cv.getBoundingClientRect(); txZoom(s.id, e.deltaY > 0 ? 1.2 : 1 / 1.2, Math.max(0, Math.min(1, (e.clientX - r.left) / (cv._pw || cv.clientWidth)))); }, { passive: false });
+    var dr = null;
+    cv.addEventListener('pointerdown', function(e){ if (e.pointerType !== 'mouse' || e.button !== 0) return; var w = TXV[s.id]; dr = { x: e.clientX, off: (w && w.off) || 0 }; try { cv.setPointerCapture(e.pointerId); } catch (x) {} });
+    cv.addEventListener('pointermove', function(e){ if (!dr) return; var w = TXV[s.id], cs = TXCD[s.id + '_' + TXTF[s.id]]; if (!w || !cs) return; w.off = dr.off + Math.round((e.clientX - dr.x) / ((cv._pw || cv.clientWidth) / w.cnt)); txView(s.id, cs.length, w.cnt); txDraw(s.id); });
+    cv.addEventListener('pointerup', function(){ dr = null; }); cv.addEventListener('pointercancel', function(){ dr = null; });
+  });
+}
+
+function txOrder(id, kind){
+  if (TXBUSY) return;
+  var pr = $('tp_' + id).value, qs = $('tq_' + id).value, qty = parseFloat(qs), price = null;
+  if (!(qty > 0)){ TXERR = '수량을 입력하세요'; txRender(); return; }
+  if (pr !== ''){ price = parseFloat(pr); if (!(price > 0)){ TXERR = '가격을 확인하세요'; txRender(); return; } }
+  TXBUSY = true; txBtns(true);
+  google.script.run.withSuccessHandler(function(st){ TXBUSY = false; txBtns(false); TXS = st; TXERR = ''; $('tq_' + id).value = ''; txRender(); txLoadQuotes(); })
+    .withFailureHandler(function(e){ TXBUSY = false; txBtns(false); TXERR = '주문 실패: ' + (e && e.message || e); txRender(); })
+    .tx_order(id, kind, price, qty);
+}
+function txBtns(d){ var a = document.querySelectorAll('.tx-ord .tx-btn'); for (var i = 0; i < a.length; i++) a[i].disabled = d; }
+
+function txLoadCandles(id){
+  var tf = TXTF[id];
+  google.script.run.withSuccessHandler(function(d){ TXCD[id + '_' + tf] = d; txDraw(id); })
+    .withFailureHandler(function(){ TXERR = '차트 불러오기 실패(' + id + ')'; }).tx_candles(id, tf);
+}
+function txLoadQuotes(){
+  google.script.run.withSuccessHandler(function(q){ TXQ = q; txRender(); }).withFailureHandler(function(){}).tx_quotes();
+}
+
+// 체결 미리보기: 입력한 가격·수량으로 주문하면 평균매수단가/실현손익이 어떻게 되는지
+function txPrev(s){
+  var el = $('tpv_' + s.id); if (!el) return;
+  var pr = $('tp_' + s.id).value, q = parseFloat($('tq_' + s.id).value), px = TXQ[s.id], p = TXS.pos[s.id];
+  var price = pr === '' ? px : parseFloat(pr);
+  if (!(q > 0) || !(price > 0)){ el.textContent = '가격을 비우면 현재가로 체결 · 지정한 가격은 현재가와 달라도 그 가격으로 체결됩니다'; return; }
+  var t = [];
+  if (!p || !p.q) t.push('매수 → 진입가 $' + txnf(price, s.dec));
+  else if (p.q > 0){
+    var nq = p.q + q, na = (p.q * p.a + q * price) / nq;
+    t.push('매수 → 평균매수단가 <b>$' + txnf(na, s.dec) + '</b> · 수량 ' + txnf(nq, 2) + (px != null ? ' · 현재가 대비 ' + txpct((px / na - 1) * 100) : ''));
+  }
+  if (p && p.q > 0){
+    var cl = Math.min(q, p.q), pnl = (price - p.a) * cl;
+    t.push('매도 → 실현손익 <b class="' + txcls(pnl) + '">' + txfm(pnl) + ' USD</b>' + (q > p.q ? ' (초과분은 숏 진입)' : ''));
+  } else if (!p || !p.q) t.push('매도 → 숏 진입가 $' + txnf(price, s.dec));
+  el.innerHTML = t.join(' &nbsp;|&nbsp; ');
+}
+
+// 물타기 기준: 현재가에서 몇 주를 사야 손실률이 목표(-3% 등)까지 줄어드는지
+function txNeed(p, px, t){
+  var tgt = px / (1 + t / 100);
+  if (p.a <= tgt) return null;
+  var x = Math.ceil(p.q * (p.a - tgt) / (tgt - px)), na = (p.q * p.a + x * px) / (p.q + x);
+  return { x: x, cost: x * px, avg: na };
+}
+function txMemo(s){
+  var p = TXS.pos[s.id], px = TXQ[s.id];
+  if (!p || !p.q) return '<b>물타기 기준</b> · 포지션이 생기면 여기에 표시됩니다.';
+  if (p.q < 0) return '<b>물타기 기준</b> · 숏 포지션은 계산하지 않습니다.';
+  if (px == null) return '<b>물타기 기준</b> · 현재가를 불러오는 중…';
+  var cur = (px / p.a - 1) * 100, d = s.dec;
+  var h = '<b>물타기 기준</b> · 현재가 $' + txnf(px, d) + ' · 내 평단 $' + txnf(p.a, d) + ' (<span class="' + txcls(cur) + '">' + txpct(cur) + '</span>)<br>';
+  var n3 = txNeed(p, px, -3);
+  if (n3) h += '목표 <b>-3%</b> → 현재가 $' + txnf(px, d) + '에서 <b>' + txnf(n3.x, 0) + '주</b> 구매하시면(약 $' + txnf(n3.cost, 0) + ') 평균매수단가는 <b>$' + txnf(n3.avg, d) + '</b>가 됩니다.';
+  else h += '이미 손실이 -3%보다 작습니다 (물타기 불필요).';
+  var n5 = txNeed(p, px, -5), n1 = txNeed(p, px, -1);
+  h += '<br><span class="tx-mu">참고: -5% → ' + (n5 ? txnf(n5.x, 0) + '주 (평단 $' + txnf(n5.avg, d) + ')' : '해당없음') + ' · -1% → ' + (n1 ? txnf(n1.x, 0) + '주 (평단 $' + txnf(n1.avg, d) + ')' : '해당없음') + '</span>';
+  return h;
+}
+
+function txRender(){
+  if (!TXS) return;
+  var un = 0;
+  TXS.syms.forEach(function(s){ var u = txupnl(s); if (u != null) un += u; });
+  var tot = TXS.realized + un, cost = 0, mv = 0;
+  TXS.syms.forEach(function(s){ var p = TXS.pos[s.id], px = TXQ[s.id]; if (!p || !p.q) return; cost += Math.abs(p.q) * p.a; mv += Math.abs(p.q) * (px == null ? p.a : px); });   // 매수총금액 / 현재가격 기준 매수총금액
+  $('txsum').innerHTML =
+    '<span><span class="k">시작잔고(매수총금액)</span><b>$' + txnf(cost) + '</b></span>' +
+    '<span><span class="k">평가잔고(현재가 기준)</span><b>$' + txnf(mv) + '</b></span>' +
+    '<span><span class="k">총손익</span><b class="' + txcls(tot) + '">' + txfm(tot) + ' USD</b></span>' +
+    '<span><span class="k">실현</span><b class="' + txcls(TXS.realized) + '">' + txfm(TXS.realized) + '</b></span>' +
+    '<span><span class="k">미실현</span><b class="' + txcls(un) + '">' + txfm(un) + '</b></span>';
+  TXS.syms.forEach(function(s){
+    var px = TXQ[s.id], p = TXS.pos[s.id];
+    $('tpx_' + s.id).textContent = px == null ? '-' : '$' + txnf(px, s.dec);
+    var btns = document.querySelectorAll('#tc_' + s.id + ' .tx-tf');
+    for (var i = 0; i < btns.length; i++) btns[i].classList.toggle('on', btns[i].dataset.t === TXTF[s.id]);
+    var u = txupnl(s);
+    $('tpl_' + s.id).innerHTML = (p && p.q)
+      ? '<span class="' + txcls(u) + '">' + (u == null ? '-' : txfm(u) + ' USD') + '</span><small>' + (p.q > 0 ? '롱 ' : '숏 ') + txnf(Math.abs(p.q), 2) + ' · 평단 ' + txnf(p.a, s.dec) + '</small>'
+      : '<span class="tx-mu">포지션 없음</span>';
+    $('tm_' + s.id).innerHTML = txMemo(s);
+    txPrev(s);
+    txDraw(s.id);
+  });
+  var t = '<tr><th>종목</th><th>방향</th><th>수량</th><th>평균단가</th><th>현재가</th><th>손익(USD)</th><th>수익률</th></tr>', n = 0;
+  TXS.syms.forEach(function(s){
+    var p = TXS.pos[s.id]; if (!p || !p.q) return; n++;
+    var u = txupnl(s), px = TXQ[s.id], rt = px == null ? null : (px - p.a) / p.a * (p.q > 0 ? 1 : -1) * 100;
+    t += '<tr><td>' + s.name + '</td><td class="' + (p.q > 0 ? 'tx-up' : 'tx-dn') + '">' + (p.q > 0 ? '롱' : '숏') + '</td><td>' + txnf(Math.abs(p.q), 2) + '</td><td>' + txnf(p.a, s.dec) + '</td><td>' + (px == null ? '-' : txnf(px, s.dec)) +
+      '</td><td class="' + txcls(u) + '">' + (u == null ? '-' : txfm(u)) + '</td><td class="' + txcls(rt) + '">' + (rt == null ? '-' : txpct(rt)) + '</td></tr>';
+  });
+  if (!n) t += '<tr><td colspan="7" class="tx-mu" style="text-align:center">열려있는 포지션이 없습니다</td></tr>';
+  $('txptab').innerHTML = t;
+  txHist();
+  $('txftr').innerHTML = (TXERR ? '<span class="tx-dn">' + TXERR + '</span> · ' : '') + '현재가 20초 간격 갱신 · 입력한 가격·수량 그대로 즉시 체결(수수료·슬리피지 없음) · 모의거래(실제 돈 없음)';
+}
+
+function txHist(){
+  var ch = '<button class="tx-chip' + (TXHF === 'ALL' ? ' on' : '') + '" data-f="ALL">전체</button>';
+  TXS.syms.forEach(function(s){ ch += '<button class="tx-chip' + (TXHF === s.id ? ' on' : '') + '" data-f="' + s.id + '">' + s.name + '</button>'; });
+  $('txhchips').innerHTML = ch;
+  $('txhchips').onclick = function(e){ var b = e.target.closest('button'); if (b){ TXHF = b.dataset.f; txHist(); } };
+  var rows = TXS.hist.filter(function(r){ return TXHF === 'ALL' || r[1] === TXHF; }), h = '';
+  rows.forEach(function(r){
+    var s = txsym(r[1]) || { name: r[1], dec: 2 };
+    h += '<div class="tx-hl">' + txtstr(r[0]) + ' · <b>' + s.name + '</b> ' + (r[2] === 'L' ? '롱' : '숏') + ' 청산 · ' + txnf(r[3], 2) + ' · ' +
+      txnf(r[4], s.dec) + ' → ' + txnf(r[5], s.dec) + ' · <b class="' + txcls(r[6]) + '">' + txfm(r[6]) + ' USD</b></div>';
+  });
+  $('txhist').innerHTML = h || '<div class="tx-mu" style="padding:6px 2px">마감된 거래가 없습니다</div>';
+}
+
+// NVDA·TQQQ 일봉 신호 (v2): 200일선 위 = 보유 · 20일선 대비 과열(NVDA 10% / TQQQ 12%)이면 익절(SELL), 5·10일선까지 조정받으면 재진입(BUY)
+// 200일선보다 5% 넘게 아래에서 RSI 과매도(NVDA RSI3<10 / TQQQ RSI5<20)면 반등 매수(BUY), 단기선(5·10일선) 회복 시 매도(SELL)
+function txSig(cs, id){
+  var P = id === 'NVDA' ? { rl: 3, th: 10, dx: 5, ext: 10, re: 5 } : { rl: 5, th: 20, dx: 10, ext: 12, re: 10 };
+  var n = cs.length, c = cs.map(function(k){ return k.c; }), i;
+  function sma(len){ var o = [], sum = 0; for (var j = 0; j < n; j++){ sum += c[j]; if (j >= len) sum -= c[j - len]; o[j] = j >= len - 1 ? sum / len : null; } return o; }
+  var m = sma(200), s5 = sma(5), s10 = sma(10), s20 = sma(20), r = [], gg = 0, ll = 0;
+  for (i = 1; i < n; i++){
+    var df = c[i] - c[i-1], u = Math.max(df, 0), w = Math.max(-df, 0);
+    if (i <= P.rl){ gg += u / P.rl; ll += w / P.rl; r[i] = i === P.rl ? 100 - 100 / (1 + gg / (ll || 1e-9)) : null; }
+    else { gg = (gg * (P.rl - 1) + u) / P.rl; ll = (ll * (P.rl - 1) + w) / P.rl; r[i] = 100 - 100 / (1 + gg / (ll || 1e-9)); }
+  }
+  var tp = 0, dp = 0, s = -1, ev = {}, DX = P.dx === 5 ? s5 : s10, RE = P.re === 5 ? s5 : s10;
+  for (i = 199; i < n; i++){
+    var tOn = c[i] > m[i];
+    if (tOn && c[i] > s20[i] * (1 + P.ext / 100)) tp = 1;
+    if (tp && (c[i] < RE[i] || !tOn)) tp = 0;
+    if (!dp){ if (c[i] < m[i] * 0.95 && r[i] != null && r[i] < P.th) dp = 1; }
+    else if (c[i] > DX[i] || c[i] > m[i]) dp = 0;
+    var wv = ((tOn && !tp) || dp) ? 1 : 0;
+    /* NVDA BUY/SELL 표시 삭제 */
+    s = wv;
+  }
+  var L = n - 1;
+  return { m: m, ev: ev, st: s, gap: m[L] ? (c[L] / m[L] - 1) * 100 : null, rsi: r[L], rl: P.rl };
+}
+// QQQM 일봉 신호: 위쪽 'QQQM 실시간 차트'(VIX 방식)의 BUY/SELL 을 그대로 가져옴 (표시 모양만 NVDA 방식)
+function txQsig(cs){
+  var ev = {}, tf = QT.filter(function(x){ return x.id === '1d'; })[0];
+  try {
+    if (tf && rawQ['1d'] && rawQ['1d'].length){
+      var A = seriesQ(tf), T = sigTrades(A, true, tf), pos = {}, k;
+      cs.forEach(function(c, j){ pos[c.t] = j; });
+      for (k in T.buy){ var jb = pos[A.t[+k] * 1000]; if (jb != null) ev[jb] = (T.buy[k] && T.buy[k].lab) || 'BUY'; }
+      for (k in T.add){ var ja = pos[A.t[+k] * 1000]; if (ja != null) ev[ja] = 'ADD'; }
+      for (k in T.sell){ var js = pos[A.t[+k] * 1000]; if (js != null) ev[js] = 'SELL'; }
+    }
+  } catch (e) {}
+  return { m: [], ev: ev, st: null, gap: null, rsi: null, rl: 0 };
+}
+var TXV = {};
+function txView(id, len, N0){
+  var tf = TXTF[id], w = TXV[id];
+  if (!w || w.tf !== tf) w = TXV[id] = { tf: tf, cnt: N0, off: 0 };
+  w.cnt = Math.max(Math.min(15, len), Math.min(len, Math.round(w.cnt)));
+  w.off = Math.max(0, Math.min(len - w.cnt, Math.round(w.off)));
+  return w;
+}
+function txZoom(id, f, fx){
+  var cv = $('tcv_' + id), cs = TXCD[id + '_' + TXTF[id]]; if (!cv || !cs || !cs.length) return;
+  var len = cs.length, w = txView(id, len, cv._n0 || Math.min(len, 90));
+  var left = len - w.off - w.cnt, anchor = left + fx * w.cnt, nc = Math.max(Math.min(15, len), Math.min(len, Math.round(w.cnt * f)));
+  if (f > 1 && nc <= w.cnt) nc = Math.min(len, w.cnt + 1); if (f < 1 && nc >= w.cnt) nc = Math.max(Math.min(15, len), w.cnt - 1);
+  w.off = len - nc - (anchor - fx * nc); w.cnt = nc; txView(id, len, nc); txDraw(id);
+}
+document.addEventListener('click', function(e){
+  var b = e.target.closest && e.target.closest('[data-z]'); if (!b || !b.dataset.s) return;
+  var id = b.dataset.s, k = b.dataset.z;
+  if (k === 'reset'){ TXV[id] = null; txDraw(id); } else txZoom(id, k === 'out' ? 1.3 : 1 / 1.3, .5);
+});
+function txDraw(id){
+  var cv = $('tcv_' + id); if (!cv) return;
+  var s = txsym(id), cs = (TXCD[id + '_' + TXTF[id]] || []).slice(), px = TXQ[id];
+  var dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  g.font = '11px sans-serif';
+  if (!cs.length){ g.fillStyle = css('--ink3'); g.fillText('차트 불러오는 중…', 12, 24); return; }
+  if (px != null){ var L = cs[cs.length-1]; cs[cs.length-1] = { t:L.t, o:L.o, h:Math.max(L.h, px), l:Math.min(L.l, px), c:px }; }
+  var sigMode = id === 'NVDA' && TXTF[id] === '1d', qMode = (id === 'QQQM' || id === 'TQQQ') && TXTF[id] === '1d';
+  var N0 = Math.min(cs.length, (sigMode || qMode) ? (W < 500 ? 120 : 250) : (W < 500 ? 50 : 90)), w = txView(id, cs.length, N0), N = w.cnt, v = cs.slice(cs.length - w.off - N, cs.length - w.off); cv._n0 = N0; cv._pw = W - 62;
+  var p = TXS.pos[id], mn = Infinity, mx = -Infinity;
+  v.forEach(function(c){ mn = Math.min(mn, c.l); mx = Math.max(mx, c.h); });
+  if (p && p.q){ mn = Math.min(mn, p.a); mx = Math.max(mx, p.a); }
+  var sp = (mx - mn) || 1; mn -= sp * .06; mx += sp * .06;
+  var R = 62, B = 18, pw = W - R, ph = H - B, bw = pw / N;
+  function Y(x){ return ph - (x - mn) / (mx - mn) * ph; }
+  g.strokeStyle = css('--line'); g.fillStyle = css('--ink3'); g.lineWidth = 1;
+  for (var i = 0; i <= 4; i++){
+    var val = mn + (mx - mn) * i / 4, y = Y(val);
+    g.beginPath(); g.moveTo(0, y); g.lineTo(pw, y); g.stroke();
+    g.fillText(txnf(val, s.dec), pw + 4, y + 4);
+  }
+  var up = css('--buy'), dn = css('--sell');
+  v.forEach(function(c, k){
+    var x = k * bw + bw / 2, col = c.c >= c.o ? up : dn;
+    g.strokeStyle = col; g.fillStyle = col;
+    g.beginPath(); g.moveTo(x, Y(c.h)); g.lineTo(x, Y(c.l)); g.stroke();
+    var y1 = Y(c.o), y2 = Y(c.c); g.fillRect(x - bw * .35, Math.min(y1, y2), bw * .7, Math.max(1, Math.abs(y1 - y2)));
+  });
+  if ((sigMode && cs.length > 200) || qMode){
+    var SG = qMode ? txQsig(cs) : txSig(cs, id), off0 = cs.length - N - w.off, first = true;
+    g.strokeStyle = '#d9822b'; g.lineWidth = 1.5; g.beginPath();
+    v.forEach(function(c, k){
+      var mm = SG.m[off0 + k]; if (mm == null || mm < mn || mm > mx){ first = true; return; }
+      var x = k * bw + bw / 2, y = Y(mm); if (first){ g.moveTo(x, y); first = false; } else g.lineTo(x, y);
+    });
+    g.stroke(); g.lineWidth = 1;
+    var PL2 = [], RKT = { '현금': 0, 'QQQ': 1, 'QLD': 2, 'TQQQ': 3 };
+    v.forEach(function(c, k){
+      var e = SG.ev[off0 + k]; if (!e) return;
+      var ep = e.indexOf('→') > 0 ? e.split(' → ') : null, tr = !!ep && ep.length === 2 && RKT[ep[0]] != null && RKT[ep[1]] != null;
+      var x = k * bw + bw / 2, isB = e === 'BUY' || e === 'ADD' || e.indexOf('→') > 0, col = e === 'ADD' ? '#16a34a' : (tr ? (RKT[ep[1]] > RKT[ep[0]] ? up : dn) : (isB ? up : dn)), y = Y(isB ? c.l : c.h);
+      g.font = 'bold 10px sans-serif'; var tw0 = g.measureText(e).width + 12, ty = null;
+      for (var kk = 0; kk < 8 && ty == null; kk++) [isB ? 1 : -1, isB ? -1 : 1].forEach(function(sd){
+        if (ty != null) return;
+        var cy = sd > 0 ? y + 24 + kk * 19 : y - 24 - kk * 19; if (cy < 12 || cy > ph - 12) return;
+        var bb = { x: x - tw0 / 2, y: cy - 8, w: tw0 };
+        if (!PL2.some(function(q){ return bb.x < q.x + q.w + 2 && q.x < bb.x + bb.w + 2 && Math.abs(bb.y - q.y) < 18; })) { ty = cy; PL2.push(bb); }
+      });
+      if (ty == null) ty = Math.max(12, Math.min(ph - 12, isB ? y + 24 : y - 24));
+      g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 6, 0, 7); g.stroke();
+      g.lineWidth = 1; g.beginPath(); g.moveTo(x, ty > y ? y + 6 : y - 6); g.lineTo(x, ty > y ? ty - 8 : ty + 8); g.stroke();
+      g.font = 'bold 10px sans-serif'; var tw = g.measureText(e).width + 12;
+      g.fillStyle = css('--panel'); g.fillRect(x - tw / 2, ty - 8, tw, 16); g.strokeRect(x - tw / 2, ty - 8, tw, 16);
+      g.fillStyle = col; g.textAlign = 'center'; g.fillText(e, x, ty + 3.5); g.textAlign = 'left'; g.font = '11px sans-serif';
+    });
+    if (false){
+      var stTxt = '신호 ' + (SG.st ? 'BUY · 보유' : 'SELL · 현금') + '  |  200일선 ' + (SG.gap >= 0 ? '+' : '') + SG.gap.toFixed(1) + '%  |  RSI' + SG.rl + ' ' + Math.round(SG.rsi);
+      g.font = 'bold 11px sans-serif'; g.textAlign = 'right'; g.fillStyle = SG.st ? up : dn; g.fillText(stTxt, pw - 8, 14); g.textAlign = 'left'; g.font = '11px sans-serif';
+    }
+  }
+  var tf = TXTF[id], step = Math.max(1, Math.round(N / 5)); g.fillStyle = css('--ink3');
+  for (var k2 = 0; k2 < N; k2 += step){
+    var d = new Date(v[k2].t), lb = tf === '15m' || tf === '1h' ? txpad(d.getMonth()+1) + '/' + txpad(d.getDate()) + ' ' + txpad(d.getHours()) + ':00' : (d.getFullYear() % 100) + '/' + txpad(d.getMonth()+1) + '/' + txpad(d.getDate());
+    g.fillText(lb, Math.min(k2 * bw, pw - 70), H - 4);
+  }
+  if (px != null){
+    g.setLineDash([2, 3]); g.strokeStyle = css('--ink2'); g.beginPath(); g.moveTo(0, Y(px)); g.lineTo(pw, Y(px)); g.stroke(); g.setLineDash([]);
+    g.fillStyle = css('--ink'); g.fillRect(pw, Y(px) - 8, R, 16); g.fillStyle = '#fff'; g.fillText(txnf(px, s.dec), pw + 4, Y(px) + 4);
+  }
+  if (p && p.q){
+    var u = txupnl(s), ec = u >= 0 ? up : dn;
+    g.setLineDash([6, 4]); g.strokeStyle = ec; g.beginPath(); g.moveTo(0, Y(p.a)); g.lineTo(pw, Y(p.a)); g.stroke(); g.setLineDash([]);
+    g.fillStyle = ec; g.fillRect(pw, Y(p.a) - 8, R, 16); g.fillStyle = '#fff'; g.fillText('평단 ' + txnf(p.a, s.dec), pw + 3, Y(p.a) + 4);
+    if (u != null){
+      var txt = (p.q > 0 ? '롱 ' : '숏 ') + '손익 ' + txfm(u) + ' USD'; g.font = 'bold 13px sans-serif';
+      var tw = g.measureText(txt).width + 16; g.fillStyle = ec; g.fillRect(8, 8, tw, 24); g.fillStyle = '#fff'; g.fillText(txt, 16, 25); g.font = '11px sans-serif';
+    }
+  }
+  if (cv._mx != null && cv._mx < pw){
+    var my = Math.max(0, Math.min(ph, cv._my));
+    g.strokeStyle = css('--ink3'); g.setLineDash([3, 3]); g.beginPath(); g.moveTo(cv._mx, 0); g.lineTo(cv._mx, ph); g.moveTo(0, my); g.lineTo(pw, my); g.stroke(); g.setLineDash([]);
+    var pv = mn + (ph - my) / ph * (mx - mn); g.fillStyle = css('--ink'); g.fillRect(pw, my - 8, R, 16); g.fillStyle = '#fff'; g.fillText(txnf(pv, s.dec), pw + 4, my + 4);
+  }
+}
+function txResize(){ if (TXS) TXS.syms.forEach(function(s){ txDraw(s.id); }); }
+
+$('txrst').onclick = function(){
+  var b = $('txrst');
+  if (!b._arm){ b._arm = 1; $('txrmsg').textContent = '한 번 더 누르면 잔고 $10,000,000·내역이 모두 초기화됩니다'; setTimeout(function(){ b._arm = 0; $('txrmsg').textContent = ''; }, 4000); return; }
+  b._arm = 0; $('txrmsg').textContent = '';
+  google.script.run.withSuccessHandler(function(st){ TXS = st; txRender(); }).tx_reset();
+};
+
+google.script.run.withSuccessHandler(function(st){
+  TXS = st; txBuild(); txRender();
+  st.syms.forEach(function(s){ txLoadCandles(s.id); });
+  txLoadQuotes();
+  setInterval(function(){ if (!document.hidden) txLoadQuotes(); }, 20000);
+  setInterval(function(){ if (!document.hidden) TXS.syms.forEach(function(s){ txLoadCandles(s.id); }); }, 60000);
+  setInterval(function(){ if (!document.hidden && !TXBUSY) google.script.run.withSuccessHandler(function(x){ if (!TXBUSY){ TXS = x; txRender(); } }).tx_state(); }, 60000);
+}).withFailureHandler(function(e){ $('txsum').innerHTML = '<span class="tx-dn">불러오기 실패: ' + (e && e.message || e) + '</span>'; }).tx_state();
+</script>
+</body>
+</html>

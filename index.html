@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>8537 Trading</title>
+<meta name="theme-color" content="#1b1f2d">
+<style>
+  html, body { margin:0; height:100%; background:#1b1f2d; }
+  .bar { position:fixed; top:0; left:0; right:0; height:48px; background:#1b1f2d;
+         display:flex; align-items:center; justify-content:space-between; gap:10px; padding:0 14px;
+         padding-top:env(safe-area-inset-top, 0px); box-sizing:border-box;
+         color:#aab0bc; font:600 13px/1 -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; }
+  .cats { display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; }
+  .cats::-webkit-scrollbar { display:none; }
+  .cat { background:transparent; color:#cfd3dc; border:1px solid #3a4152; border-radius:999px;
+         padding:7px 14px; font:inherit; font-size:14px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .cat.on { background:#fff; color:#1b1f2d; border-color:#fff; }
+  #app { position:fixed; top:48px; left:0; width:100%; height:calc(100% - 48px); border:0; display:block; background:#f6f7fa; }
+  @media (max-width: 480px) { .bar { padding:0 8px; } .bar .host { display:none; } .cat { padding:6px 11px; font-size:13px; } }
+</style>
+</head>
+<body>
+<div class="bar">
+  <nav class="cats" id="cats"></nav>
+  <span class="host">8537.netlify.app</span>
+</div>
+<iframe id="app" title="8537" allow="clipboard-write"></iframe>
+<script>
+  var CATS = [
+    { id: 'trading', label: '💹 Trading', title: '8537 Trading', page: 'trading.html' },
+    { id: 'sim',     label: '🧪 Simulation', title: '8537 Simulation', page: 'sim.html' },
+    { id: 'gongdu',  label: '📰 공두일보', title: '8537 공두일보', page: 'gongdu.html' }
+  ];
+  var DEFAULT = 'trading';   // 주소에 #이 없으면 Trading 이 제일 먼저
+  function show(id) {
+    var c = CATS.filter(function (x) { return x.id === id; })[0] || CATS.filter(function (x) { return x.id === DEFAULT; })[0];
+    document.getElementById('cats').innerHTML = CATS.map(function (x) {
+      return '<button class="cat' + (x.id === c.id ? ' on' : '') + '" onclick="go(\'' + x.id + '\')">' + x.label + '</button>';
+    }).join('');
+    var f = document.getElementById('app');
+    if (f.getAttribute('src') !== c.page) f.setAttribute('src', c.page);
+    document.title = c.title;
+  }
+  function go(id) { if (location.hash !== '#' + id) location.hash = id; else show(id); }
+  window.addEventListener('hashchange', function () { show(location.hash.slice(1)); });
+  show(location.hash.slice(1));
+</script>
+</body>
+</html>
