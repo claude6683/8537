@@ -33,7 +33,7 @@
     var c = prompt('동기화 코드 (기기마다 같은 코드를 입력하면 포지션이 공유돼요. 비우면 해제)', cur);
     if (c === null) return;
     c = c.trim();
-    if (c && c.length < 10) { alert('코드는 10자 이상으로 해주세요 (짧으면 남이 맞출 수 있어요)'); return; }
+    if (c && c.length < 4) { alert('코드는 4자 이상으로 해주세요'); return; }
     try { localStorage.setItem('8537-sync-code', c.trim()); } catch (e) {}
     document.getElementById('app').contentWindow.location.reload();
   };
