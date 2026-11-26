@@ -17,7 +17,7 @@
       .then(function (r) { if (!r.ok) throw new Error('데이터 없음 (' + r.status + ')'); return r.json(); });
   }
   function dataUrl(fn, a) {
-    var k = a.map(function (x) { return x == null ? '' : String(x); }).join('_') || 'x';
+    if (fn === 'sim_get') a = [a[0]]; var k = a.map(function (x) { return x == null ? '' : String(x); }).join('_') || 'x';
     return 'https://raw.githubusercontent.com/claude6683/8537/main/' + 'data/' + fn + '/' + encodeURIComponent(k) + '.json';
   }
 
