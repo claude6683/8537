@@ -24,9 +24,18 @@
 <body>
 <div class="bar">
   <nav class="cats" id="cats"></nav>
-  <span class="host">8537.pages.dev</span>
+  <button id="sync" title="동기화 코드" style="margin-left:auto;background:none;border:1px solid #444;color:#aaa;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px">🔑</button><span class="host">8537.pages.dev</span>
 </div>
 <iframe id="app" title="8537" allow="clipboard-write"></iframe>
+<script>
+  document.getElementById('sync').onclick = function () {
+    var cur = ''; try { cur = localStorage.getItem('8537-sync-code') || ''; } catch (e) {}
+    var c = prompt('동기화 코드 (기기마다 같은 코드를 입력하면 포지션이 공유돼요. 비우면 해제)', cur);
+    if (c === null) return;
+    try { localStorage.setItem('8537-sync-code', c.trim()); } catch (e) {}
+    document.getElementById('app').contentWindow.location.reload();
+  };
+</script>
 <script>
   var CATS = [
     { id: 'trading', label: '💹 Trading', sh: 'Trading', title: '8537 Trading', page: 'trading.html' },

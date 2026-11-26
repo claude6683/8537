@@ -22,11 +22,35 @@
   }
 
   /* ----- 모의거래: 브라우저 저장 ----- */
-  function txLoad() {
-    try { var v = JSON.parse(localStorage.getItem(SK) || 'null'); if (v && v.pos && Array.isArray(v.hist) && isFinite(v.realized)) return Promise.resolve(v); } catch (e) {}
-    return Promise.resolve(JSON.parse(JSON.stringify(SEED)));
+  var CK = '8537-sync-code';
+  function code() { try { return (localStorage.getItem(CK) || '').trim(); } catch (e) { return ''; } }
+  function sha(c) {
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode('8537:' + c)).then(function (b) {
+      return Array.prototype.map.call(new Uint8Array(b), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+    });
   }
-  function txSave(st) { try { localStorage.setItem(SK, JSON.stringify(st)); } catch (e) {} }
+  function okSt(v) { return v && v.pos && Array.isArray(v.hist) && isFinite(v.realized); }
+  function localSt() {
+    try { var v = JSON.parse(localStorage.getItem(SK) || 'null'); if (okSt(v)) return v; } catch (e) {}
+    return null;
+  }
+  function txLoad() {
+    var loc = localSt(), c = code();
+    if (!c || !window.crypto || !crypto.subtle) return Promise.resolve(loc || JSON.parse(JSON.stringify(SEED)));
+    return sha(c).then(function (h) {
+      return fetch('/api/tx?h=' + h, { cache: 'no-store' }).then(function (r) {
+        if (r.ok) return r.json().then(function (v) { if (okSt(v)) { try { localStorage.setItem(SK, JSON.stringify(v)); } catch (e) {} return v; } return loc || JSON.parse(JSON.stringify(SEED)); });
+        var st = loc || JSON.parse(JSON.stringify(SEED));
+        if (r.status === 404) return put(h, st).then(function () { return st; });
+        return st;
+      });
+    }).catch(function () { return loc || JSON.parse(JSON.stringify(SEED)); });
+  }
+  function put(h, st) { return fetch('/api/tx?h=' + h, { method: 'PUT', body: JSON.stringify(st) }).catch(function () {}); }
+  function txSave(st) {
+    try { localStorage.setItem(SK, JSON.stringify(st)); } catch (e) {}
+    var c = code(); if (c && window.crypto && crypto.subtle) sha(c).then(function (h) { return put(h, st); });
+  }
   function txView(st) { return { startUsd: TX_START, syms: TX_SYMS, realized: st.realized, pos: st.pos, hist: st.hist }; }
   function txApply(st, s, q, price) {
     var p = st.pos[s.id];
