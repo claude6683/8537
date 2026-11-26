@@ -34,22 +34,30 @@
     try { var v = JSON.parse(localStorage.getItem(SK) || 'null'); if (okSt(v)) return v; } catch (e) {}
     return null;
   }
+  var DK = '8537-tx-dirty';
+  function dirty(v) { try { if (v === undefined) return localStorage.getItem(DK) === '1'; if (v) localStorage.setItem(DK, '1'); else localStorage.removeItem(DK); } catch (e) {} }
+  function put(h, st) {
+    return fetch('/api/tx?h=' + h, { method: 'PUT', body: JSON.stringify(st) })
+      .then(function (r) { if (r.ok) dirty(false); return r.ok; }).catch(function () { return false; });
+  }
   function txLoad() {
-    var loc = localSt(), c = code();
-    if (!c || !window.crypto || !crypto.subtle) return Promise.resolve(loc || JSON.parse(JSON.stringify(SEED)));
+    var loc = localSt(), c = code(), seed = function () { return loc || JSON.parse(JSON.stringify(SEED)); };
+    if (!c || !window.crypto || !crypto.subtle) return Promise.resolve(seed());
     return sha(c).then(function (h) {
       return fetch('/api/tx?h=' + h, { cache: 'no-store' }).then(function (r) {
-        if (r.ok) return r.json().then(function (v) { if (okSt(v)) { try { localStorage.setItem(SK, JSON.stringify(v)); } catch (e) {} return v; } return loc || JSON.parse(JSON.stringify(SEED)); });
-        var st = loc || JSON.parse(JSON.stringify(SEED));
-        if (r.status === 404) return put(h, st).then(function () { return st; });
-        return st;
+        if (r.ok) return r.json().then(function (v) {
+          if (loc && dirty()) { put(h, loc); return loc; }
+          if (okSt(v)) { try { localStorage.setItem(SK, JSON.stringify(v)); } catch (e) {} return v; }
+          return seed();
+        });
+        if (r.status === 404 && loc) return put(h, loc).then(function () { return loc; });
+        return seed();
       });
-    }).catch(function () { return loc || JSON.parse(JSON.stringify(SEED)); });
+    }).catch(function () { return seed(); });
   }
-  function put(h, st) { return fetch('/api/tx?h=' + h, { method: 'PUT', body: JSON.stringify(st) }).catch(function () {}); }
   function txSave(st) {
     try { localStorage.setItem(SK, JSON.stringify(st)); } catch (e) {}
-    var c = code(); if (c && window.crypto && crypto.subtle) sha(c).then(function (h) { return put(h, st); });
+    var c = code(); if (c && window.crypto && crypto.subtle) { dirty(true); sha(c).then(function (h) { return put(h, st); }); }
   }
   function txView(st) { return { startUsd: TX_START, syms: TX_SYMS, realized: st.realized, pos: st.pos, hist: st.hist }; }
   function txApply(st, s, q, price) {
