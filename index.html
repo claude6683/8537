@@ -14,11 +14,11 @@
   .cats { display:flex; gap:5px; flex-wrap:nowrap; min-width:0; overflow:hidden; }
   .cats::-webkit-scrollbar { display:none; }
   .cat { background:transparent; color:#cfd3dc; border:1px solid #3a4152; border-radius:999px;
-         padding:7px 14px; font:inherit; font-size:14px; font-weight:700; cursor:pointer; white-space:nowrap; }
+         padding:7px var(--tp,14px); font:inherit; font-size:var(--tf,14px);touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .cat.drag { position:relative; z-index:2; opacity:.9; box-shadow:0 4px 14px rgba(0,0,0,.55); cursor:grabbing; }
   .cat.on { background:#fff; color:#1b1f2d; border-color:#fff; }
   #app { position:fixed; top:48px; left:0; width:100%; height:calc(100% - 48px); border:0; display:block; background:#f6f7fa; }
-  @media (max-width: 480px) { .bar { padding:0 6px; } .bar .host { display:none; } .cat { padding:6px 8px; font-size:12px; } }
-  @media (max-width: 380px) { .cat { padding:6px 6px; font-size:11px; } }
+  @media (max-width: 480px) { .bar { padding:0 6px; } .bar .host { display:none; } }
 </style>
 </head>
 <body>
@@ -29,23 +29,124 @@
 <iframe id="app" title="8537" allow="clipboard-write"></iframe>
 <script>
   var CATS = [
-    { id: 'trading', label: '💹 Trading', title: '8537 Trading', page: 'trading.html' },
-    { id: 'sim',     label: '🧪 Simulation', title: '8537 Simulation', page: 'sim.html' },
-    { id: 'gongdu',  label: '📰 공두일보', title: '8537 공두일보', page: 'gongdu.html' },
-    { id: 'nasdaq-alert', label: '🚨 nasdaq-alert', title: '8537 nasdaq-alert', page: 'https://claude6683.github.io/nasdaq-alert/' }
+    { id: 'trading', label: '💹 Trading', sh: 'Trading', title: '8537 Trading', page: 'trading.html' },
+    { id: 'gongdu',  label: '📰 공두일보', sh: '공두', title: '8537 공두일보', page: 'gongdu.html' },
+    { id: 'sim',     label: '🧪 Simulation', sh: 'Sim', title: '8537 Simulation', page: 'sim.html' },
+    { id: 'nasdaq-alert', label: '🚨 nasdaq-alert', sh: 'NQ', title: '8537 nasdaq-alert', page: 'https://claude6683.github.io/nasdaq-alert/' }
   ];
-  var DEFAULT = 'trading';   // 주소에 #이 없으면 Trading 이 제일 먼저
+  var DEFAULT = 'trading';
+  var KEY = '8537-tabs-order';
+  try {
+    var saved = JSON.parse(localStorage.getItem(KEY) || '[]');
+    if (Array.isArray(saved)) {
+      var rank = function (x) { var i = saved.indexOf(x.id); return i < 0 ? 99 : i; };
+      CATS = CATS.map(function (x, i) { return [x, i]; }).sort(function (p, q) { return rank(p[0]) - rank(q[0]) || p[1] - q[1]; }).map(function (p) { return p[0]; });
+    }
+  } catch (e) {}
+  var bar = document.getElementById('cats'), curId = DEFAULT;
+  CATS.forEach(function (x) {
+    var b = document.createElement('button');
+    b.className = 'cat'; b.setAttribute('data-id', x.id); b.textContent = x.label;
+    bar.appendChild(b);
+  });
+  function fit() {
+    var bs = [].slice.call(bar.children), pass, f, ok = false;
+    for (pass = 0; pass < 2 && !ok; pass++) {
+      bs.forEach(function (b) { var c = CATS.filter(function (x) { return x.id === b.getAttribute('data-id'); })[0]; b.textContent = pass ? c.sh : c.label; });
+      for (f = 14; f >= (pass ? 8 : 9); f -= 0.5) {
+        bar.style.setProperty('--tf', f + 'px');
+        bar.style.setProperty('--tp', Math.max(3, Math.round(f * 0.9)) + 'px');
+        if (bar.scrollWidth <= bar.clientWidth) { ok = true; break; }
+      }
+    }
+  }
   function show(id) {
     var c = CATS.filter(function (x) { return x.id === id; })[0] || CATS.filter(function (x) { return x.id === DEFAULT; })[0];
-    document.getElementById('cats').innerHTML = CATS.map(function (x) {
-      return '<button class="cat' + (x.id === c.id ? ' on' : '') + '" onclick="go(\'' + x.id + '\')">' + x.label + '</button>';
-    }).join('');
+    curId = c.id;
+    [].forEach.call(bar.children, function (b) { b.classList.toggle('on', b.getAttribute('data-id') === c.id); });
     var f = document.getElementById('app');
     if (f.getAttribute('src') !== c.page) f.setAttribute('src', c.page);
     document.title = c.title;
   }
   function go(id) { if (location.hash !== '#' + id) location.hash = id; else show(id); }
   window.addEventListener('hashchange', function () { show(location.hash.slice(1)); });
+
+  // drag reorder: mouse >5px, touch long-press 0.35s; order saved in browser
+  (function () {
+    var cur = null, sx = 0, grab = 0, mode = false, timer = 0, pid = null, touch = false, moved = false, lastX = 0, raf = 0;
+    bar.addEventListener('dragstart', function (e) { e.preventDefault(); });
+    bar.addEventListener('click', function (e) {
+      if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; return; }
+      var b = e.target.closest ? e.target.closest('.cat') : null;
+      if (b) go(b.getAttribute('data-id'));
+    }, true);
+    bar.addEventListener('contextmenu', function (e) { if (mode || touch) e.preventDefault(); });
+    bar.addEventListener('touchmove', function (e) { if (mode && e.cancelable) e.preventDefault(); }, { passive: false });
+    bar.addEventListener('pointerdown', function (e) {
+      var a = e.target.closest ? e.target.closest('.cat') : null;
+      if (cur || !a || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      cur = a; pid = e.pointerId; sx = e.clientX; lastX = sx; mode = false; moved = false;
+      touch = e.pointerType !== 'mouse';
+      if (touch) { clearTimeout(timer); timer = setTimeout(function () { if (cur) start(); }, 350); }
+    });
+    function start() {
+      mode = true; moved = true;
+      cur.classList.add('drag');
+      grab = lastX - cur.getBoundingClientRect().left;
+      try { cur.setPointerCapture(pid); } catch (e) {}
+      if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
+      place();
+    }
+    function place() {
+      if (!cur || !mode) return;
+      var x = lastX, again = true, guard = 0;
+      while (again && guard++ < 20) {
+        again = false;
+        var tabs = [].slice.call(bar.children), i = tabs.indexOf(cur);
+        cur.style.transform = 'none';
+        for (var k = 0; k < tabs.length; k++) {
+          if (tabs[k] === cur) continue;
+          var r = tabs[k].getBoundingClientRect(), c = r.left + r.width / 2;
+          if (k < i && x < c) { bar.insertBefore(cur, tabs[k]); again = true; break; }
+          if (k > i && x > c) { bar.insertBefore(cur, tabs[k].nextSibling); again = true; break; }
+        }
+      }
+      cur.style.transform = 'none';
+      var nr = cur.getBoundingClientRect();
+      cur.style.transform = 'translateX(' + (lastX - grab - nr.left) + 'px)';
+    }
+    window.addEventListener('pointermove', function (e) {
+      if (!cur || e.pointerId !== pid) return;
+      lastX = e.clientX;
+      if (!mode) {
+        var d = Math.abs(lastX - sx);
+        if (!touch && d > 5) start();
+        else if (touch && d > 10) { clearTimeout(timer); cur = null; }
+        return;
+      }
+      if (!raf) raf = requestAnimationFrame(function () { raf = 0; place(); });
+    });
+    function end(e) {
+      if (!cur || (e && e.pointerId !== pid)) return;
+      clearTimeout(timer);
+      if (mode) {
+        cur.classList.remove('drag'); cur.style.transform = '';
+        try { cur.releasePointerCapture(pid); } catch (er) {}
+        var ids = [].map.call(bar.children, function (b) { return b.getAttribute('data-id'); });
+        CATS.sort(function (p, q) { return ids.indexOf(p.id) - ids.indexOf(q.id); });
+        try { localStorage.setItem(KEY, JSON.stringify(ids)); } catch (er) {}
+        setTimeout(function () { moved = false; }, 0);
+      }
+      cur = null; mode = false;
+    }
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  })();
+
+  fit();
+  window.addEventListener('resize', fit);
+  window.addEventListener('orientationchange', fit);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
   show(location.hash.slice(1));
 </script>
 </body>
