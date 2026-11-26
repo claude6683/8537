@@ -372,7 +372,7 @@ async function simGet() {
 async function sim_get(kind) { if (kind !== 'T') return null; return await simGet(); }
 async function sim_marks() {
   const d = await simGet(); if (!d || !d.marks) return null;
-  return { m: d.marks.map((x) => [d.T[x.k] * 86400, SL(x.f, x.t)]), now: d.now ? { name: d.now.name, since: d.now.since } : null };
+  return { m: d.marks.map((x) => [d.T[x.k] * 86400, SL(x.f, x.t), (({ C: 0, Q: 1, L: 2, T: 3 })[x.t] > ({ C: 0, Q: 1, L: 2, T: 3 })[x.f] ? 1 : 0)]), now: d.now ? { name: d.now.name, since: d.now.since } : null };
 }
 async function tripodBlock() {
   try {
@@ -546,7 +546,7 @@ const J = (o, s) => new Response(JSON.stringify(o), { status: s || 200, headers:
 export default async (req) => {
   const fn = new URL(req.url).pathname.split('/').pop();
   let a = []; try { const b = await req.json(); a = b.a || []; } catch (e) {}
-  if (!FN[fn]) return J({ ok: false, e: 'unknown ' + fn }, 404);
+  if (!Object.prototype.hasOwnProperty.call(FN, fn)) return J({ ok: false, e: 'unknown ' + fn }, 404);
   try { return J({ ok: true, d: await FN[fn].apply(null, a) }); } catch (e) { return J({ ok: false, e: String((e && e.message) || e) }); }
 };
 export const jobs = {
