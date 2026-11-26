@@ -467,7 +467,7 @@ function load(){
   var y='https://query1.finance.yahoo.com/v8/finance/chart/%5EIXIC?range=10y&interval=1d';
   var px=['https://corsproxy.io/?','https://api.allorigins.win/raw?url=','https://api.codetabs.com/v1/proxy?quest='].map(function(p){return p+encodeURIComponent(y);});
   function chk(j){if(!j||!j.chart||!j.chart.result)throw 0;return j;}
-  fetchJ('../xyz-data/ixic.json?t='+Date.now()).then(chk).catch(function(){
+  fetchJ('https://raw.githubusercontent.com/claude6683/8537/main/data/ixic.json?t='+Math.floor(Date.now()/60000)).then(chk).catch(function(){
     return new Promise(function(res,rej){var f=0;px.forEach(function(u){fetchJ(u).then(chk).then(res,function(){if(++f===px.length)rej();});});});
   }).then(function(j){setBars(parseY(j),'Yahoo Finance 일봉 (실시간 아님)');}).catch(function(){
     $('live').className='off';$('live').textContent='● 자동 수집 실패';
