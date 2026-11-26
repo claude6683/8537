@@ -126,12 +126,20 @@ function tripodHtml(t, alertInfo) {
   else alPart += '<div class="sigbig ' + esc(al.alert.s) + '">' + esc(al.alert.s) + ' ' + esc(al.alert.lv) + '</div>' +
     '<div class="sub">' + esc(al.alert.d) + ' · 종가 ' + al.alert.c.toFixed(1) + ' · RSI ' + al.alert.rsi.toFixed(1) + ' · %B ' + al.alert.pb.toFixed(2) + ' · %K ' + al.alert.k.toFixed(1) + ' · 이격도 ' + (al.alert.dp >= 0 ? '+' : '') + al.alert.dp.toFixed(1) + '%</div>';
   left = '<div class="card half"><div class="hp">' + sigPart + '</div><div class="hp">' + alPart + '</div></div>';
+  let tr;
   if (t && t.trades && t.trades.length) {
-    right = '<div class="card"><h2>시그널 거래내역 (최근 3건)</h2><div class="tbl" style="margin:0"><table><tr><th>발생일</th><th>시그널</th><th>QQQ 가격</th><th>52주 고점 대비</th><th>VIX</th></tr>' +
+    tr = '<h2>시그널 거래내역 (최근 3건)</h2><div class="tbl" style="margin:0"><table><tr><th>발생일</th><th>시그널</th><th>QQQ 가격</th><th>52주 고점 대비</th><th>VIX</th></tr>' +
       t.trades.map(r => '<tr><td>' + esc(r.d) + '</td><td class="' + (r.s === 'BUY' ? 'up' : 'down') + '" style="font-weight:700">' + esc(r.label) + '</td><td>' +
         (r.p == null ? '-' : '$' + r.p.toFixed(2)) + '</td><td class="' + (r.dd == null ? '' : cls(r.dd)) + '">' + (r.dd == null ? '-' : pct(r.dd)) + '</td><td>' + (r.vx == null ? '-' : r.vx.toFixed(2)) + '</td></tr>').join('') +
-      '</table></div></div>';
-  } else right = '<div class="card"><h2>시그널 거래내역 (최근 3건)</h2><div class="empty">거래 내역이 없습니다.</div></div>';
+      '</table></div>';
+  } else tr = '<h2>시그널 거래내역 (최근 3건)</h2><div class="empty">거래 내역이 없습니다.</div>';
+  let nr = '<h2>nasdaq-alert 최근 경보 (최근 3건)</h2>';
+  if (al && al.recent && al.recent.length) {
+    nr += '<div class="tbl" style="margin:0"><table><tr><th>발생일</th><th>경보</th><th>종가</th><th>RSI</th><th>%B</th><th>%K</th><th>이격도</th></tr>' +
+      al.recent.map(r => '<tr><td>' + esc(r.d) + '</td><td class="' + (r.s === 'BUY' ? 'up' : 'down') + '" style="font-weight:700">' + esc(r.s) + ' ' + esc(r.lv) + '</td><td>' + r.c.toFixed(1) + '</td><td>' + r.rsi.toFixed(1) + '</td><td>' + r.pb.toFixed(2) + '</td><td>' + r.k.toFixed(1) + '</td><td>' + (r.dp >= 0 ? '+' : '') + r.dp.toFixed(1) + '%</td></tr>').join('') +
+      '</table></div>';
+  } else nr += '<div class="empty">' + (al ? '최근 경보 없음' : '경보 데이터를 불러오지 못했습니다.') + '</div>';
+  right = '<div class="card half"><div class="hp">' + tr + '</div><div class="hp">' + nr + '</div></div>';
   return '<div class="two">' + left + right + '</div>';
 }
 
