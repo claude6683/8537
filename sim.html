@@ -173,7 +173,7 @@ function qcDraw(s) {
     const td = D.T[m.k] * 86400 + 23 * 3600; let lo2 = 0, hi2 = n - 1, j = -1;
     while (lo2 <= hi2) { const md = (lo2 + hi2) >> 1; if (R[md][0] <= td) { j = md; lo2 = md + 1; } else hi2 = md - 1; }
     if (j < 0 || td - R[j][0] > span) return;
-    const x = X(j), cl = buy ? up : dn, y = buy ? Y(R[j][3]) + 5 : Y(R[j][2]) - 5, d = buy ? 1 : -1;
+    const x = X(j), cl = ({ C: 0, Q: 1, L: 2, T: 3 })[m.t] > ({ C: 0, Q: 1, L: 2, T: 3 })[m.f] ? up : dn, y = buy ? Y(R[j][3]) + 5 : Y(R[j][2]) - 5, d = buy ? 1 : -1;
     g.fillStyle = cl; g.beginPath(); g.moveTo(x, y); g.lineTo(x - 6, y + 11 * d); g.lineTo(x + 6, y + 11 * d); g.closePath(); g.fill();
     const lb = SL(m.f, m.t), lw = g.measureText(lb).width + 4;
     let row = 0, ly = 0; for (; row < 6; row++) { ly = y + (21 + row * 14) * d; if (!PL.some(p => p.d === d && p.r === row && Math.abs(p.x - x) < (p.w + lw) / 2)) break; }
