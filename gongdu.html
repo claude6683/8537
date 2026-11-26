@@ -46,7 +46,11 @@
   .sigbig { font-size: 30px; font-weight: 800; letter-spacing: -.02em; padding: 10px 0 4px; }
   .sigbig.BUY { color: var(--buy); } .sigbig.SELL { color: var(--sell); }
   .sub { color: var(--ink2); font-size: 12px; }
-  .cols { display: grid; grid-template-columns: 3fr 2fr; gap: 12px; align-items: start; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: stretch; }
+  .half .hp + .hp { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
+  .half .sigbig { padding: 6px 0 2px; }
+  .sched.schedrow { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 16px; }
+  .sched.schedrow li { border-bottom: 0; padding: 2px 0; }
   .news { list-style: none; margin: 0; padding: 0; }
   .news li { display: flex; gap: 8px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--line); }
   .news li:last-child { border-bottom: 0; }
@@ -87,6 +91,8 @@
     .idx { grid-template-columns: repeat(2, 1fr); }
     .idx .ix:first-child { grid-column: 1 / -1; }
     .cols, .conds, .two { grid-template-columns: 1fr; }
+    .sched.schedrow { grid-auto-flow: row; grid-auto-columns: auto; gap: 0; }
+    .sched.schedrow li { border-bottom: 1px solid var(--line); padding: 7px 0; }
     .title h1 { font-size: 19px; }
     .ix .v { font-size: 18px; }
     .wrap { padding: 8px; }
@@ -107,12 +113,19 @@ function mark(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, '<span class="red">$1
 function cls(v) { return v > 0 ? 'up' : v < 0 ? 'down' : 'flat'; }
 function pct(v) { return (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%'; }
 
-function tripodHtml(t) {
+function tripodHtml(t, alertInfo) {
   let left, right;
-  if (t && t.now) {
-    left = '<div class="card"><h2>Tripod 현재 시그널</h2><div class="sigbig ' + esc(t.now.s) + '">' + esc(t.now.label) + '</div>' +
-           '<div class="sub">발생 ' + esc(t.now.since) + (t.hold ? ' · 현재 보유 ' + esc(t.hold) : '') + '</div></div>';
-  } else left = '<div class="card"><h2>Tripod 현재 시그널</h2><div class="empty">시그널을 불러오지 못했습니다.</div></div>';
+  const sigPart = (t && t.now)
+    ? '<h2>Tripod 현재 시그널</h2><div class="sigbig ' + esc(t.now.s) + '">' + esc(t.now.label) + '</div>' +
+      '<div class="sub">발생 ' + esc(t.now.since) + (t.hold ? ' · 현재 보유 ' + esc(t.hold) : '') + '</div>'
+    : '<h2>Tripod 현재 시그널</h2><div class="empty">시그널을 불러오지 못했습니다.</div>';
+  const al = alertInfo;
+  let alPart = '<h2>nasdaq-alert 최근 경보</h2>';
+  if (!al) alPart += '<div class="empty">경보 데이터를 불러오지 못했습니다.</div>';
+  else if (!al.alert) alPart += '<div class="empty">최근 경보 없음</div>';
+  else alPart += '<div class="sigbig ' + esc(al.alert.s) + '">' + esc(al.alert.s) + ' ' + esc(al.alert.lv) + '</div>' +
+    '<div class="sub">' + esc(al.alert.d) + ' · 종가 ' + al.alert.c.toFixed(1) + ' · RSI ' + al.alert.rsi.toFixed(1) + ' · %B ' + al.alert.pb.toFixed(2) + ' · %K ' + al.alert.k.toFixed(1) + ' · 이격도 ' + (al.alert.dp >= 0 ? '+' : '') + al.alert.dp.toFixed(1) + '%</div>';
+  left = '<div class="card half"><div class="hp">' + sigPart + '</div><div class="hp">' + alPart + '</div></div>';
   if (t && t.trades && t.trades.length) {
     right = '<div class="card"><h2>시그널 거래내역 (최근 3건)</h2><div class="tbl" style="margin:0"><table><tr><th>발생일</th><th>시그널</th><th>QQQ 가격</th><th>52주 고점 대비</th><th>VIX</th></tr>' +
       t.trades.map(r => '<tr><td>' + esc(r.d) + '</td><td class="' + (r.s === 'BUY' ? 'up' : 'down') + '" style="font-weight:700">' + esc(r.label) + '</td><td>' +
@@ -139,8 +152,8 @@ function render(d) {
     return '<div class="ix"><div class="t"><div class="k">' + esc(x.k) + '</div><div class="v">' + esc(x.v) + '</div>' + c +
            '</div><div class="b">' + esc(x.sub) + '</div></div>';
   }).join('') + '</div><div style="height:12px"></div>';
-  h += tripodHtml(b.tripod);
-  h += '<div class="cols"><div>' +
+  h += tripodHtml(b.tripod, b.alert);
+  h += '<div class="cols">' +
        '<div class="card"><div class="vh"><span class="nm"><i class="dot"></i>VIX 변동성지수 <span class="vq" id="vq"></span></span>' +
        '<span class="tabs" id="vtabs"></span></div>' +
        '<div class="vtools"><span class="tabs" id="vmode"></span><span class="tabs"><button data-z="in">＋ 확대</button><button data-z="out">－ 축소</button><button data-z="reset">초기화</button></span></div>' +
@@ -151,10 +164,10 @@ function render(d) {
          '<a href="' + esc(/^https?:/i.test(n.l) ? n.l : '#') + '" target="_blank" rel="noopener">' + esc(n.t) + '</a><span class="s">' + esc(n.s) + '</span></li>'
        ).join('') + '</ul>' : '<div class="empty">뉴스를 불러오지 못했습니다.</div>') + '</div></div>';
   h += '<div class="card"><h2>' + (b.weekend ? '다음 주 미리보기' : '다음 일정 체크포인트') + '</h2>' +
-       (b.sched.length ? '<ul class="sched">' + b.sched.map(s =>
+       (b.sched.length ? '<ul class="sched schedrow">' + b.sched.map(s =>
          '<li><div class="w">' + esc(s.when) + ' (KST)</div><div>' + esc(s.t) + '</div>' +
          ((s.f || s.p) ? '<div class="fp">예상 ' + esc(s.f || '-') + ' · 이전 ' + esc(s.p || '-') + '</div>' : '') + '</li>'
-       ).join('') + '</ul>' : '<div class="empty">예정된 미국 주요 지표가 없습니다.</div>') + '</div></div>';
+       ).join('') + '</ul>' : '<div class="empty">예정된 미국 주요 지표가 없습니다.</div>') + '</div>';
   const o = b.opinion;
   h += '<div class="card"><h2>공두일보 투자의견</h2>' +
        '<div class="tbl"><table><tr><th>지표</th><th>값</th><th>판단</th></tr>' +
