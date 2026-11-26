@@ -22,8 +22,8 @@ function edays(k) { return Math.floor(Date.parse(k + 'T00:00:00Z') / 86400000); 
 /* ---------- 캐시 / 저장소 ---------- */
 const mem = new Map();
 let _c = null, _p = null;
-function cs() { if (_c === null) { try { _c = getStore({ name: 'cache', consistency: 'strong' }); } catch (e) { _c = false; } } return _c; }
-function ps() { if (_p === null) { try { _p = getStore({ name: 'data', consistency: 'strong' }); } catch (e) { _p = false; } } return _p; }
+function cs() { try { return getStore({ name: 'cache', consistency: 'strong' }); } catch (e) { return false; } }
+function ps() { try { return getStore({ name: 'data', consistency: 'strong' }); } catch (e) { return false; } }
 async function cget(k, ttl) {
   const m = mem.get(k); if (m && m.e > Date.now()) return m.v;
   if (ttl <= 120) return null;
