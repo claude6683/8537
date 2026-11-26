@@ -562,7 +562,7 @@ function sigTradesTri(A, tf) {
       const td = e[0] + 23 * 3600; let lo = 0, hi = n - 1, j = -1;
       while (lo <= hi) { const mid = (lo + hi) >> 1; if (A.t[mid] <= td) { j = mid; lo = mid + 1; } else hi = mid - 1; }
       if (j < 0 || td - A.t[j] > span) return;
-      buy[j] = { p: null, x: null, w: 1, lab: e[1] };
+      buy[j] = { p: null, x: null, w: 1, lab: e[1], up: e[2] };
     });
   }
   return { buy: buy, sell: sell, add: {}, ret: null, n: 0, pf: 0 };
@@ -666,7 +666,7 @@ function pivotChart(id, tf, count, showSig, hvId, hwId, scId, o) {
     if (!box) box = { x: bx, y: Math.max(2, Math.min(g.H - 22 - bh, top ? py - 12 - bh : py + 12)), h: bh };
     placed.push(box);
     const RKS = { '현금': 0, 'QQQ': 1, 'QLD': 2, 'TQQQ': 3 }, lp = (tb && tb.lab) ? String(tb.lab).split(' → ') : null;
-    const ec = (lp && lp.length === 2 && RKS[lp[0]] != null && RKS[lp[1]] != null) ? (RKS[lp[1]] > RKS[lp[0]] ? col.BUY : col.SELL) : (top ? col.SELL : (isAdd ? col.ADD : col.BUY));
+    const ec = (tb && tb.up != null) ? (tb.up ? col.BUY : col.SELL) : (lp && lp.length === 2 && RKS[lp[0]] != null && RKS[lp[1]] != null) ? (RKS[lp[1]] > RKS[lp[0]] ? col.BUY : col.SELL) : (top ? col.SELL : (isAdd ? col.ADD : col.BUY));
     // 연결선 + 점
     x.strokeStyle = ink3; x.lineWidth = 1; x.beginPath(); x.moveTo(px, py); x.lineTo(px, box.y < py ? box.y + bh : box.y); x.stroke();
     x.fillStyle = ec; x.strokeStyle = panel; x.lineWidth = 2; x.beginPath(); x.arc(px, py, 3, 0, 7); x.fill(); x.stroke();
