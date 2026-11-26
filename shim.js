@@ -23,7 +23,7 @@
 
   /* ----- 모의거래: 브라우저 저장 ----- */
   function txLoad() {
-    try { var v = JSON.parse(localStorage.getItem(SK) || 'null'); if (v && v.pos) return Promise.resolve(v); } catch (e) {}
+    try { var v = JSON.parse(localStorage.getItem(SK) || 'null'); if (v && v.pos && Array.isArray(v.hist) && isFinite(v.realized)) return Promise.resolve(v); } catch (e) {}
     return Promise.resolve(JSON.parse(JSON.stringify(SEED)));
   }
   function txSave(st) { try { localStorage.setItem(SK, JSON.stringify(st)); } catch (e) {} }
@@ -47,7 +47,7 @@
     tx_order: function (id, side, price, qty) {
       var s = TX_SYMS.filter(function (x) { return x.id === id; })[0];
       if (!s) return Promise.reject(new Error('종목 없음'));
-      qty = Number(qty); if (!(qty > 0)) return Promise.reject(new Error('수량을 확인하세요'));
+      qty = Number(qty); if (!(qty > 0) || !isFinite(qty) || qty < 0.000001) return Promise.reject(new Error('수량을 확인하세요'));
       if (side !== 'buy' && side !== 'sell') return Promise.reject(new Error('주문 구분 오류'));
       var pr = (price === null || price === undefined || price === '')
         ? getJSON(dataUrl('tx_quotes', [])).then(function (q) { return +q[id]; })
@@ -70,7 +70,6 @@
         return function () {
           var a = Array.prototype.slice.call(arguments), fn = String(name);
           while (a.length && a[a.length - 1] === undefined) a.pop();
-          if (fn === 'sim_get') a = a.slice(0, 1);
           var p = LOCAL[fn] ? LOCAL[fn].apply(null, a) : getJSON(dataUrl(fn, a));
           p.then(function (d) { if (ok) ok(d); }).catch(function (e) { if (err) err(e); });
         };

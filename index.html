@@ -24,7 +24,7 @@
 <body>
 <div class="bar">
   <nav class="cats" id="cats"></nav>
-  <span class="host">claude6683.github.io/8537</span>
+  <span class="host">8537.netlify.app</span>
 </div>
 <iframe id="app" title="8537" allow="clipboard-write"></iframe>
 <script>
@@ -114,6 +114,7 @@
       cur.style.transform = 'none';
       var nr = cur.getBoundingClientRect();
       cur.style.transform = 'translateX(' + (lastX - grab - nr.left) + 'px)';
+      try { cur.setPointerCapture(pid); } catch (e) {}
     }
     window.addEventListener('pointermove', function (e) {
       if (!cur || e.pointerId !== pid) return;
